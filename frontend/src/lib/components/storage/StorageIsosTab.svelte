@@ -274,17 +274,6 @@
         {/each}
       </select>
 
-      <Button
-        size="sm"
-        variant="outline"
-        class="!h-7 !px-2 !text-xs"
-        onclick={() => loadIsos(selectedISOPool)}
-        disabled={loadingIsos}
-        title={t('storage.refreshIsos')}
-      >
-        <Icon name="refresh" size={13} class={cn(loadingIsos && 'animate-spin')} />
-      </Button>
-
       <div class="relative w-48 sm:w-60">
         <Icon
           name="search"
@@ -313,7 +302,7 @@
         {t('storage.refreshIsos')}
       </Button>
 
-      {#if selectedISOPool === '__all__' && isoTargetPool}
+      {#if isoTargetPool}
         <span class="text-[11px] text-muted-foreground">
           {t('storage.willUploadTo')} <span class="font-mono text-foreground">{isoTargetPool}</span>
         </span>
