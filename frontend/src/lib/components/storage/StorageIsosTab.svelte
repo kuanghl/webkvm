@@ -287,21 +287,20 @@
           class="w-full pl-7 pr-2.5 py-1 rounded-lg bg-background border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       </div>
-    </div>
 
-    <div class="flex flex-wrap items-center gap-2">
       <Button
         size="sm"
         variant="outline"
-        class="!h-8 !text-xs"
+        class="!h-7 !px-2 !text-xs"
         onclick={() => loadIsos(selectedISOPool)}
         disabled={loadingIsos}
         title={t('storage.refreshIsos')}
       >
-        <Icon name="refreshCw" size={13} class={cn('mr-1', loadingIsos && 'animate-spin')} />
-        {t('storage.refreshIsos')}
+        <Icon name="refreshCw" size={13} class={cn(loadingIsos && 'animate-spin')} />
       </Button>
+    </div>
 
+    <div class="flex flex-wrap items-center gap-2">
       {#if isoTargetPool}
         <span class="text-[11px] text-muted-foreground">
           {t('storage.willUploadTo')} <span class="font-mono text-foreground">{isoTargetPool}</span>
