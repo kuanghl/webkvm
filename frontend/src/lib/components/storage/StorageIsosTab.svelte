@@ -54,14 +54,15 @@
 
   const isoPools = $derived(pools.filter((p) => hasPurpose(p, 'iso')));
 
-  // Single source of truth: the upload/download target follows the
-  // listing dropdown. When a specific ISO pool is selected, that pool
-  // is used for uploads. When "All pools" is selected, fall back to the
-  // first available ISO pool so uploads always have a valid target.
+  // Single source of truth: the selected listing pool is also the upload
+  // target. "All pools" falls back to the first ISO pool so uploads always
+  // have a valid destination.
   const isoTargetPool = $derived(
-    selectedISOPool && selectedISOPool !== '__all__' && isoPools.find((p) => p.name === selectedISOPool)
+    selectedISOPool &&
+      selectedISOPool !== '__all__' &&
+      isoPools.some((p) => p.name === selectedISOPool)
       ? selectedISOPool
-      : (isoPools[0]?.name || '')
+      : isoPools[0]?.name || ''
   );
 
   $effect(() => {
@@ -273,6 +274,17 @@
         {/each}
       </select>
 
+      <Button
+        size="sm"
+        variant="outline"
+        class="!h-7 !px-2 !text-xs"
+        onclick={() => loadIsos(selectedISOPool)}
+        disabled={loadingIsos}
+        title={t('storage.refreshIsos')}
+      >
+        <Icon name="refresh" size={13} class={cn(loadingIsos && 'animate-spin')} />
+      </Button>
+
       <div class="relative w-48 sm:w-60">
         <Icon
           name="search"
@@ -303,7 +315,7 @@
 
       {#if selectedISOPool === '__all__' && isoTargetPool}
         <span class="text-[11px] text-muted-foreground">
-          {t('storage.willUploadTo')} {isoTargetPool}
+          {t('storage.willUploadTo')} <span class="font-mono text-foreground">{isoTargetPool}</span>
         </span>
       {/if}
 

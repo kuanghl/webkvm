@@ -1114,6 +1114,11 @@ export const messages = {
       cpuFlagActive: 'Active overrides',
       cpuFlagNoMatch: 'No matches',
       videoModelLabel: 'Video Model',
+      accel3dLabel: '3D acceleration (virgl)',
+      accel3dHelper:
+        'Virtio-GPU renders on the host GPU. Required by Wayland compositors (niri, sway, Hyprland) and for GL/Mesa apps inside the guest.',
+      accel3dUnavailable:
+        'This host cannot provide 3D acceleration: it needs a /dev/dri/renderD* node plus QEMU GL modules and libvirt egl-headless support.',
       networkLabel: 'Network',
       adapter: 'Adapter',
       chipsetLocked: '(locked)',
@@ -1321,7 +1326,7 @@ export const messages = {
       revertSnapshotDesc:
         'Current VM state will be lost. The VM will be reverted to this snapshot.',
       reverted: 'Reverted to snapshot',
-      revertDisabledShutoff: 'VM must be shut off to revert snapshots',
+      revertNeedsShutoff: 'Shut the VM off to revert a disk-only snapshot',
       deleteSnapshotTitle: 'Delete snapshot?',
       deleteSnapshotDesc: 'This will permanently delete the snapshot. Cannot be undone.',
       snapshotDeleted: 'Snapshot deleted',
@@ -1557,6 +1562,7 @@ export const messages = {
       downloadUrl: 'Download URL',
       isoTargetPool: 'Target pool',
       noIsoPool: 'No ISO pool available',
+      refreshIsos: 'Refresh',
       willUploadTo: 'Upload to:',
       downloadIsoFromUrl: 'Download an ISO from a URL',
       filenameOptional: 'Filename (optional)',
@@ -4947,6 +4953,11 @@ export const messages = {
       cpuFlagActive: 'Anulaciones activas',
       cpuFlagNoMatch: 'Sin resultados',
       videoModelLabel: 'Modelo de vídeo',
+      accel3dLabel: 'Aceleración 3D (virgl)',
+      accel3dHelper:
+        'Virtio-GPU renderiza en la GPU del anfitrión. Necesario para compositores Wayland (niri, sway, Hyprland) y para apps con GL/Mesa dentro del invitado.',
+      accel3dUnavailable:
+        'Este anfitrión no puede ofrecer aceleración 3D: requiere un nodo /dev/dri/renderD* y módulos GL de QEMU con soporte egl-headless en libvirt.',
       networkLabel: 'Red',
       adapter: 'Adaptador',
       chipsetLocked: '(bloqueado)',
@@ -5161,7 +5172,7 @@ export const messages = {
       revertSnapshotDesc:
         'Se perderá el estado actual de la VM. La VM se revertirá a esta instantánea.',
       reverted: 'Revertida a la instantánea',
-      revertDisabledShutoff: 'La VM debe estar apagada para revertir instantáneas',
+      revertNeedsShutoff: 'Apaga la VM para revertir una instantánea de solo disco',
       deleteSnapshotTitle: '¿Borrar la instantánea?',
       deleteSnapshotDesc: 'Esto borrará permanentemente la instantánea. No se puede deshacer.',
       snapshotDeleted: 'Instantánea borrada',
@@ -5401,6 +5412,7 @@ export const messages = {
       downloadUrl: 'Descargar URL',
       isoTargetPool: 'Pool destino',
       noIsoPool: 'No hay ningún pool ISO disponible',
+      refreshIsos: 'Actualizar',
       willUploadTo: 'Subir a:',
       downloadIsoFromUrl: 'Descargar un ISO desde una URL',
       filenameOptional: 'Nombre de archivo (opcional)',
@@ -8824,6 +8836,11 @@ export const messages = {
       cpuFlagActive: 'Anul·lacions actives',
       cpuFlagNoMatch: 'Sense resultats',
       videoModelLabel: 'Model de vídeo',
+      accel3dLabel: 'Acceleració 3D (virgl)',
+      accel3dHelper:
+        "Virtio-GPU renderitza a la GPU de l'amfitrió. Necessari per a compositors Wayland (niri, sway, Hyprland) i per a apps amb GL/Mesa dins del convidat.",
+      accel3dUnavailable:
+        'Aquest amfitrió no pot oferir acceleració 3D: cal un node /dev/dri/renderD* i mòduls GL de QEMU amb suport egl-headless a libvirt.',
       networkLabel: 'Xarxa',
       adapter: 'Adaptador',
       chipsetLocked: '(bloquejat)',
@@ -9037,7 +9054,7 @@ export const messages = {
       revertSnapshotDesc:
         "Es perdrà l'estat actual de la VM. La VM es revertirà a aquesta instantània.",
       reverted: 'Revertida a la instantània',
-      revertDisabledShutoff: "La VM ha d'estar apagada per revertir instantànies",
+      revertNeedsShutoff: 'Apaga la VM per revertir una instantània només de disc',
       deleteSnapshotTitle: '¿Esborrar la instantània?',
       deleteSnapshotDesc: 'Això esborrarà permanentment la instantània. No es pot desfer.',
       snapshotDeleted: 'Instantània esborrada',
@@ -9279,6 +9296,7 @@ export const messages = {
       downloadUrl: 'Descarrega URL',
       isoTargetPool: 'Pool destí',
       noIsoPool: 'No hi ha cap pool ISO disponible',
+      refreshIsos: 'Actualitza',
       willUploadTo: 'Puja a:',
       downloadIsoFromUrl: "Descarrega un ISO des d'una URL",
       filenameOptional: 'Nom de fitxer (opcional)',

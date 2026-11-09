@@ -462,9 +462,10 @@ func (h *Handler) requireISOPoolForCaller(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) requireISOPool(w http.ResponseWriter, name string) bool {
 	purpose, ok := h.lookupPoolPurpose(name)
-	// If the pool exists but has no explicit purpose, infer it from the name.
-	// This handles pools created before the purpose system or with custom paths.
 	if !ok {
+		// Pools created before the purpose system (or with a custom path)
+		// have no explicit tag; infer from the name so they still accept
+		// ISO uploads instead of failing with "not designated for ISOs".
 		purpose = compute.InferPoolPurpose(name)
 	}
 	if !compute.HasPurpose(purpose, compute.PoolPurposeISO) {

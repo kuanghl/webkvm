@@ -137,6 +137,11 @@
                   version: status.latest_version || status.backend.version,
                 })}
               {/if}
+              {#if status.latest_commit}
+                <span class="ml-1.5 font-mono text-xs text-muted-foreground">
+                  · {status.latest_commit}
+                </span>
+              {/if}
             </div>
             <div class="text-xs text-muted-foreground mt-0.5">
               {status.update_mode === 'source'

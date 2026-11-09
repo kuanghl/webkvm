@@ -18,8 +18,11 @@ import (
 // on anything else, which keeps the tests honest about what they touch.
 type fakePoolBackend struct {
 	compute.Backend
-	pools       []models.StoragePool
-	poolPath    string
+	pools    []models.StoragePool
+	poolPath string
+	// volumes is the fake libvirt volume registry: a name present here is
+	// "known to libvirt"; anything else is a ghost file on disk.
+	volumes     map[string]bool
 	attachments map[string][]models.VolumeAttachment // "pool/vol" -> attachments
 }
 
@@ -36,11 +39,15 @@ func (f *fakePoolBackend) GetPoolPath(name string) (string, error) {
 
 func (f *fakePoolBackend) RefreshPool(name string) error { return nil }
 
-func (f *fakePoolBackend) FindVolumeAttachments(pool, vol string) ([]models.VolumeAttachment, error) {
-	if f.attachments != nil {
-		return f.attachments[pool+"/"+vol], nil
+func (f *fakePoolBackend) GetStorageVolume(pool, vol string) (models.StorageVolume, error) {
+	if f.volumes[vol] {
+		return models.StorageVolume{Name: vol, Pool: pool}, nil
 	}
-	return nil, nil
+	return models.StorageVolume{}, fmt.Errorf("%w: %s", compute.ErrVolumeNotFound, vol)
+}
+
+func (f *fakePoolBackend) FindVolumeAttachments(pool, vol string) ([]models.VolumeAttachment, error) {
+	return f.attachments[pool+"/"+vol], nil
 }
 
 func newPoolTestHandler(pools ...models.StoragePool) *Handler {

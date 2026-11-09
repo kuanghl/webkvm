@@ -106,19 +106,20 @@
       </div>
     </div>
     <div class="flex gap-1 shrink-0">
-      <button
-        onclick={() => revertSnapshot(node.id)}
-        disabled={vmState !== 'shutoff'}
-        class="text-xs px-2 py-1 rounded-md border transition-colors {vmState !== 'shutoff'
-          ? 'text-muted-foreground/50 border-border/50 cursor-not-allowed'
-          : 'text-warning border-warning/30 hover:bg-warning/10 hover:border-warning/50'}"
-        title={vmState !== 'shutoff'
-          ? t('vmDetail.revertDisabledShutoff')
-          : t('vmDetail.revert')}
-      >
-        <Icon name="rotateCcw" size={12} class="inline mr-1 -mt-0.5" />
-        {t('vmDetail.revert')}
-      </button>
+      {#if !node.current}
+        {@const revertBlocked = vmState !== 'shutoff' && !node.has_memory}
+        <button
+          onclick={() => revertSnapshot(node.id)}
+          disabled={revertBlocked}
+          class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-colors {revertBlocked
+            ? 'text-muted-foreground/50 border-border/50 cursor-not-allowed'
+            : 'text-warning border-warning/30 hover:bg-warning/10 hover:border-warning/50'}"
+          title={revertBlocked ? t('vmDetail.revertNeedsShutoff') : t('vmDetail.revert')}
+        >
+          <Icon name="rotateCcw" size={12} />
+          {t('vmDetail.revert')}
+        </button>
+      {/if}
       <button
         onclick={() => deleteSnapshot(node.id)}
         class="text-xs text-muted-foreground hover:text-destructive px-2 py-1 rounded hover:bg-destructive/10"

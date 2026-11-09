@@ -21,6 +21,8 @@ import (
 )
 
 func (h *Handler) UploadISO(w http.ResponseWriter, r *http.Request) {
+	// 50 GiB matches UploadDisk: multi-edition Windows and recovery ISOs
+	// routinely exceed 10 GiB.
 	r.Body = http.MaxBytesReader(w, r.Body, 50<<30)
 
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
