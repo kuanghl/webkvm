@@ -32,6 +32,9 @@ frontend/.svelte-kit/
 # Local development context — never committed.
 CLAUDE.md
 CONTEXT_NOTES.md
+.repowise
+.mcp.json
+opencode.json
 
 # TLS certs (self-signed, host-specific, generated on first deploy)
 certs/
