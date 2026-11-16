@@ -1,9 +1,13 @@
 package api
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func directive(csp, name string) string {
@@ -14,6 +18,21 @@ func directive(csp, name string) string {
 		}
 	}
 	return ""
+}
+
+// renderConsolePage renders the VNC/SPICE console page for a fake VM id and
+// returns the recorder and the body.
+func renderConsolePage(t *testing.T) (*httptest.ResponseRecorder, string) {
+	t.Helper()
+	h := &Handler{}
+	r := chi.NewRouter()
+	r.Get("/console/{id}", h.ConsolePage)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/console/vm1", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d", rr.Code)
+	}
+	return rr, rr.Body.String()
 }
 
 // #25: connect-src must not allow arbitrary ws:/wss: hosts.

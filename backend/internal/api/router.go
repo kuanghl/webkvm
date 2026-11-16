@@ -363,7 +363,6 @@ func NewRouter(
 				r.Post("/vnc-ticket", h.VNCTicket)
 				r.Get("/rdp", h.DownloadRDP)
 				r.Get("/spice", h.DownloadSPICE)
-				r.Post("/clipboard", h.SetClipboard)
 			})
 
 			// USB device passthrough: admin only.

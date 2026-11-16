@@ -492,7 +492,6 @@ body.embedded #status{bottom:8px;right:8px;padding:3px 8px;font-size:10px}
 #status .dot.ok{background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4)}
 #status .dot.error{background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4)}
 @keyframes pulse{0%%,100%%{opacity:1}50%%{opacity:.3}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
 <body>
@@ -565,11 +564,6 @@ body.embedded #status{bottom:8px;right:8px;padding:3px 8px;font-size:10px}
 <div id="spice-area" style="display:none;width:100%%;height:100%%;position:relative;overflow:hidden;background:#020617;">
   <div id="spice-screen" style="width:100%%;height:100%%;display:flex;align-items:center;justify-content:center;overflow:hidden;"></div>
   <div id="message-div" style="display:none;"></div>
-</div>
-<div id="clip-banner" style="display:none;position:fixed;top:8px;left:50%%;transform:translateX(-50%%);z-index:1000;max-width:90vw;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;font:12px/1.4 monospace;color:#e2e8f0;background:rgba(2,6,23,.92);border:1px solid rgba(250,204,21,.5)">
-  <span id="clip-banner-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-  <button id="clip-banner-copy" type="button" style="cursor:pointer">Copy</button>
-  <button id="clip-banner-dismiss" type="button" style="cursor:pointer">Dismiss</button>
 </div>
 <div id="status"><span class="dot connecting"></span>Connecting</div>
 <script type="module">
@@ -1098,91 +1092,6 @@ document.getElementById('btnToggleKeys').onclick = function () {
     });
 };
 
-/* ---- direct clipboard ---- */
-var lastClipText = '';
-
-/* The guest must never write the host clipboard on its own (pastejacking
-   into a possibly-root terminal). Park its text behind a banner; only the
-   user's click on "Copy" (a real user gesture) writes it. */
-var pendingClip = '';
-var clipBanner = document.getElementById('clip-banner');
-var clipBannerText = document.getElementById('clip-banner-text');
-
-function hideClipBanner() {
-    pendingClip = '';
-    if (clipBanner) clipBanner.style.display = 'none';
-}
-
-function syncClipToHost(text) {
-    if (!text || text === lastClipText) return;
-    pendingClip = text.length > 1048576 ? text.slice(0, 1048576) : text;
-    if (!clipBanner || !clipBannerText) return;
-    var preview = pendingClip.replace(/\s+/g, ' ').slice(0, 60);
-    var multi = /[\r\n]/.test(pendingClip) ? ' (multi-line)' : '';
-    clipBannerText.textContent = 'The guest wants to copy ' + pendingClip.length +
-        ' characters' + multi + ': ' + preview;
-    clipBanner.style.display = 'flex';
-}
-
-(function () {
-    var accept = document.getElementById('clip-banner-copy');
-    var dismiss = document.getElementById('clip-banner-dismiss');
-    if (accept) accept.onclick = function () {
-        var text = pendingClip;
-        hideClipBanner();
-        if (!text || !navigator.clipboard) return;
-        lastClipText = text;
-        navigator.clipboard.writeText(text).catch(function () {});
-    };
-    if (dismiss) dismiss.onclick = hideClipBanner;
-})();
-
-document.addEventListener('keydown', function (e) {
-    if (!rfb || !connected) return;
-    if (!(e.key === 'v' || e.key === 'V') || !(e.ctrlKey || e.metaKey)) return;
-    var tag = document.activeElement && document.activeElement.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    e.preventDefault();
-    e.stopPropagation();
-    var ctrlCode = e.ctrlKey && e.location === 1 ? 'ControlRight' : 'ControlLeft';
-    var ctrlSym = ctrlCode === 'ControlRight' ? 0xffe4 : 0xffe3;
-    navigator.clipboard.readText().then(function (txt) {
-        if (txt && txt !== lastClipText) {
-            lastClipText = txt;
-            var x = new XMLHttpRequest();
-            x.open('POST', '/api/vms/' + vmId + '/clipboard?vt=' + encodeURIComponent(vt), true);
-            x.setRequestHeader('Content-Type', 'application/json');
-            x.onloadend = function () { doPaste(ctrlSym, ctrlCode); };
-            x.send(JSON.stringify({text: txt}));
-        } else {
-            doPaste(ctrlSym, ctrlCode);
-        }
-    }).catch(function () {
-        doPaste(ctrlSym, ctrlCode);
-    });
-    function doPaste(kSym, kCode) {
-        if (consoleMode === 'spice') {
-            if (!spiceConn || !connected) return;
-            sendSpiceKey(spiceConn, 'ControlLeft', true);
-            sendSpiceKey(spiceConn, 'KeyV', true);
-            setTimeout(function () {
-                if (!spiceConn || !connected) return;
-                sendSpiceKey(spiceConn, 'KeyV', false);
-                sendSpiceKey(spiceConn, 'ControlLeft', false);
-            }, 50);
-            return;
-        }
-        if (!rfb || !connected) return;
-        rfb.sendKey(kSym, kCode, true);
-        rfb.sendKey(0x56, 'KeyV', true);
-        setTimeout(function () {
-            if (!rfb || !connected) return;
-            rfb.sendKey(0x56, 'KeyV', false);
-            rfb.sendKey(kSym, kCode, false);
-        }, 50);
-    }
-}, true);
-
 var spAreaEl = document.getElementById('spice-area');
 if (spAreaEl) {
     spAreaEl.addEventListener('mousedown', function () {
@@ -1383,7 +1292,6 @@ function connect() {
             setTimeout(function () { if (autoRetry) connect(); }, wait);
         }
     });
-    rfb.addEventListener('clipboard', function (e) { syncClipToHost(e.detail.text); });
     rfb.scaleViewport = true;
     rfb.resizeSession = false;
     rfb.clipViewport = false;
@@ -1500,22 +1408,6 @@ full-screen=0
 	w.Header().Set("Content-Type", "application/x-virt-viewer")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.vv\"", id))
 	w.Write([]byte(spiceContent))
-}
-
-func (h *Handler) SetClipboard(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	var req struct {
-		Text string `json:"text"`
-	}
-	if err := decodeBody(r, &req); err != nil {
-		jsonErr(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := h.compute.GuestSetClipboard(id, req.Text); err != nil {
-		jsonErr(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusOK)
 }
 
 // newCSPNonce returns a fresh, unguessable value for a CSP script nonce.

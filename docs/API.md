@@ -138,7 +138,6 @@ Creates a new KVM VM or Incus container.
 #### Guest Integration & Monitoring
 - `GET /api/vms/{id}/guest-info` — Data reported by `qemu-guest-agent` (IPs, hostname, OS).
 - `POST /api/vms/{id}/reset-password` — Reset a guest account password through the guest agent.
-- `POST /api/vms/{id}/clipboard` — Push text into the guest clipboard.
 - `GET /api/vms/{id}/metrics` and `/metrics/history` — Live and historical CPU/RAM/IO counters.
 - `GET /api/vms/{id}/logs` — Recent libvirt/QEMU log lines for the instance.
 - `GET`/`PUT /api/vms/{id}/alerts` — Per-instance alert thresholds.

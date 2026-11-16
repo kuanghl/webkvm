@@ -64,7 +64,6 @@ func capMux(h *Handler) *chi.Mux {
 			r.Post("/vnc-ticket", ok)
 			r.Get("/rdp", ok)
 			r.Get("/spice", ok)
-			r.Post("/clipboard", ok)
 		})
 		r.With(h.requireCapability("export")).Get("/export", ok)
 		r.Group(func(r chi.Router) {
@@ -92,7 +91,6 @@ var consoleRoutes = []capRoute{
 	{http.MethodPost, "/api/vms/vm1/vnc-ticket"},
 	{http.MethodGet, "/api/vms/vm1/rdp"},
 	{http.MethodGet, "/api/vms/vm1/spice"},
-	{http.MethodPost, "/api/vms/vm1/clipboard"},
 }
 
 func doCapRequest(t *testing.T, mux *chi.Mux, rt capRoute) int {
@@ -107,7 +105,7 @@ func doCapRequest(t *testing.T, mux *chi.Mux, rt capRoute) int {
 
 // Denying console must deny every interactive path, even for a user who
 // legitimately owns the VM. Owning a machine and being allowed to take
-// over its screen, keyboard and clipboard are separate grants.
+// over its screen and keyboard are separate grants.
 func TestCapability_ConsoleDenialBlocksEveryConsoleRoute(t *testing.T) {
 	h := capHandler(t, &models.UserPermissions{CanConsole: boolFalse()})
 	mux := capMux(h)

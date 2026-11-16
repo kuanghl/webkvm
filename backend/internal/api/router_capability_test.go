@@ -98,7 +98,6 @@ func TestRouter_ConsoleAndExportRoutesAreRegistered(t *testing.T) {
 		"POST /api/vms/{id}/vnc-ticket",
 		"GET /api/vms/{id}/rdp",
 		"GET /api/vms/{id}/spice",
-		"POST /api/vms/{id}/clipboard",
 		"GET /api/vms/{id}/export",
 	} {
 		if !routes[w] {

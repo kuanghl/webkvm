@@ -138,7 +138,6 @@ Crea una nueva máquina virtual KVM o un contenedor Incus.
 #### Integración con el Invitado y Monitorización
 - `GET /api/vms/{id}/guest-info` — Datos que reporta `qemu-guest-agent` (IPs, nombre de host, SO).
 - `POST /api/vms/{id}/reset-password` — Restablecer la contraseña de una cuenta del invitado vía agente.
-- `POST /api/vms/{id}/clipboard` — Enviar texto al portapapeles del invitado.
 - `GET /api/vms/{id}/metrics` y `/metrics/history` — Contadores de CPU/RAM/IO en vivo e históricos.
 - `GET /api/vms/{id}/logs` — Últimas líneas de log de libvirt/QEMU de la instancia.
 - `GET`/`PUT /api/vms/{id}/alerts` — Umbrales de alerta por instancia.

@@ -503,15 +503,6 @@ func isSPICEConsolePath(path string) bool {
 	return len(rest) > 0 && strings.Count(rest, "/") == 1 && strings.HasSuffix(rest, "/spice")
 }
 
-// isClipboardPath returns true if path is exactly /api/vms/{id}/clipboard.
-func isClipboardPath(path string) bool {
-	if !strings.HasPrefix(path, "/api/vms/") {
-		return false
-	}
-	rest := strings.TrimPrefix(path, "/api/vms/")
-	return len(rest) > 0 && strings.Count(rest, "/") == 1 && strings.HasSuffix(rest, "/clipboard")
-}
-
 // vncTicketAllowedPath reports whether path is one a VNC console
 // ticket may authenticate, and extracts the VM ID it's scoped to.
 // Deliberately a short, fixed allowlist — unlike the session JWT, a
@@ -562,7 +553,7 @@ func vncTicketAllowedPath(path string) (vmID string, ok bool) {
 		return "", false
 	}
 	rest := strings.TrimPrefix(path, "/api/vms/")
-	for _, suffix := range []string{"/vnc", "/spice-ws", "/clipboard"} {
+	for _, suffix := range []string{"/vnc", "/spice-ws"} {
 		if strings.HasSuffix(rest, suffix) && strings.Count(rest, "/") == 1 {
 			return strings.TrimSuffix(rest, suffix), true
 		}
