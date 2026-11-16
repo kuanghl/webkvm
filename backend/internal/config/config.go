@@ -330,6 +330,19 @@ func (c *Config) HelperScriptsFile() string {
 	return filepath.Join(c.DataDir, "helper-scripts.json")
 }
 
+// SSHMachinesFile is the JSON file holding the SSH Machines records.
+// It never carries credentials — those live in the 0600 companion file.
+func (c *Config) SSHMachinesFile() string {
+	return filepath.Join(c.DataDir, "ssh-machines.json")
+}
+
+// SSHMachineSecretsFile holds the machine credentials (passwords and
+// private keys). Written 0600, split out of the records file so no
+// API path or export can ever serialize them.
+func (c *Config) SSHMachineSecretsFile() string {
+	return filepath.Join(c.DataDir, "ssh-machine-secrets.json")
+}
+
 // AuditLogFile is the JSONL file where the audit logger appends.
 func (c *Config) AuditLogFile() string {
 	return filepath.Join(c.DataDir, "audit.log")

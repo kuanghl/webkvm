@@ -29,10 +29,10 @@ type HostMonitor struct {
 	mu     sync.RWMutex
 
 	// CPU sampling state
-	lastCPUTotal  uint64
-	lastCPUIdle   uint64
-	lastCPUTime   time.Time
-	cpuPerCore    []cpuCoreState
+	lastCPUTotal uint64
+	lastCPUIdle  uint64
+	lastCPUTime  time.Time
+	cpuPerCore   []cpuCoreState
 
 	// Network sampling state — protected by mu
 	lastNetStats map[string]*netCounters
@@ -925,17 +925,17 @@ func getInterfaceMAC(name string) string {
 // Returns a map of interface name -> IPv4 address.
 func getAllInterfaceIPs(ctx context.Context) map[string]string {
 	result := make(map[string]string)
-	
+
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
+
 	runner := &sysutil.OSCommandRunner{}
 	// Use -o (oneline) for easier parsing
 	out, err := runner.Run(ctx, "ip", "-o", "addr", "show")
 	if err != nil {
 		return result
 	}
-	
+
 	// Parse output: "2: eth0    inet 192.168.1.100/24 ..."
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
@@ -943,19 +943,19 @@ func getAllInterfaceIPs(ctx context.Context) map[string]string {
 		if line == "" {
 			continue
 		}
-		
+
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
 		}
-		
+
 		// Find "inet" field (IPv4)
 		for i, field := range fields {
 			if field == "inet" && i+1 < len(fields) {
 				ifaceName := fields[1]
 				// Remove trailing colon from interface name if present
 				ifaceName = strings.TrimSuffix(ifaceName, ":")
-				
+
 				ipWithCIDR := fields[i+1]
 				// Remove CIDR suffix
 				if idx := strings.Index(ipWithCIDR, "/"); idx > 0 {
@@ -967,7 +967,7 @@ func getAllInterfaceIPs(ctx context.Context) map[string]string {
 			}
 		}
 	}
-	
+
 	return result
 }
 

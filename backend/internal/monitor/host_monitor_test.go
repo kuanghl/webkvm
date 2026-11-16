@@ -954,11 +954,11 @@ func TestGroupDisksBindMounts(t *testing.T) {
 	// Simulate a system where /dev/sda2 is mounted at / and also bind-mounted to /bin, /etc, /usr
 	// All these mounts report the same UsedBytes because they share the same filesystem
 	disks := []models.HostDiskInfo{
-		{Device: "/dev/sda1", Mount: "/boot", FSType: "ext4", TotalBytes: 1073741824, UsedBytes: 536870912, UsagePercent: 50},      // 1GB, 50% used
-		{Device: "/dev/sda2", Mount: "/", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50},         // 30GB, 50% used
-		{Device: "/dev/sda2", Mount: "/bin", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50},      // bind mount - same data
-		{Device: "/dev/sda2", Mount: "/etc", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50},      // bind mount - same data
-		{Device: "/dev/sda2", Mount: "/usr", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50},      // bind mount - same data
+		{Device: "/dev/sda1", Mount: "/boot", FSType: "ext4", TotalBytes: 1073741824, UsedBytes: 536870912, UsagePercent: 50},   // 1GB, 50% used
+		{Device: "/dev/sda2", Mount: "/", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50},    // 30GB, 50% used
+		{Device: "/dev/sda2", Mount: "/bin", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50}, // bind mount - same data
+		{Device: "/dev/sda2", Mount: "/etc", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50}, // bind mount - same data
+		{Device: "/dev/sda2", Mount: "/usr", FSType: "ext4", TotalBytes: 32212254720, UsedBytes: 16106127360, UsagePercent: 50}, // bind mount - same data
 	}
 
 	groups := groupDisksByPhysicalDevice(disks)

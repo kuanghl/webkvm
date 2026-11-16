@@ -64,7 +64,7 @@
     const cmd = terminalCommand(slug);
     copyState.copy(cmd);
     toast.info(`Comando de ${name} copiado. Pégalo en la terminal del host para iniciar la TUI.`);
-    navigate('/host-console');
+    navigate('/machines/host');
   }
 
   async function load() {

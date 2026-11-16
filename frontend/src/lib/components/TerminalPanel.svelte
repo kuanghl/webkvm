@@ -13,6 +13,7 @@
     Clipboard,
     SlidersHorizontal,
     Download,
+    FileDown,
   } from '@lucide/svelte';
   import { Terminal } from '@xterm/xterm';
   import { FitAddon } from '@xterm/addon-fit';
@@ -23,6 +24,8 @@
   import { createGuestClipboardProvider } from '$lib/utils/terminalClipboard.js';
   import '@xterm/xterm/css/xterm.css';
   import { TERMINAL_THEMES, TUI_KEYS } from '$lib/utils/terminalConfig.js';
+  import ZmodemPanel from '$lib/components/machine/ZmodemPanel.svelte';
+  import { ZmodemClient } from '$lib/components/machine/zmodemClient.svelte.js';
   import {
     terminalSettings,
     setTerminalTheme,
@@ -36,10 +39,23 @@
    * High-performance, full-featured embedded terminal.
    * Supports both Host Root Terminal and VM/Container Serial Consoles.
    *
-   * mode: 'vm'   -> connects to /api/vms/{vmId}/serial
-   * mode: 'host' -> connects to /api/host/terminal (admin)
+   * mode: 'vm'      -> connects to /api/vms/{vmId}/serial
+   * mode: 'host'    -> connects to /api/host/terminal (admin)
+   * mode: 'machine' -> connects to /api/ssh-machines/{machineId}/terminal
+   *                    (SSH/Telnet/Serial machine bridge; initial grid
+   *                     defaults to 120x30, the fit addon resizes it)
+   * machineProtocol: that machine's protocol, which decides whether the
+   *                    ZMODEM download affordance appears (telnet and
+   *                    serial have no SFTP; SSH machines already do)
    */
-  let { mode = 'vm', vmId = null, height = '480px', fullPage = false } = $props();
+  let {
+    mode = 'vm',
+    vmId = null,
+    machineId = null,
+    machineProtocol = '',
+    height = '480px',
+    fullPage = false,
+  } = $props();
 
   let container = $state(null);
   let status = $state('idle'); // idle | connecting | connected | closed | error
@@ -49,6 +65,18 @@
   // Text the guest asked to put on the clipboard (OSC 52). Never applied
   // automatically; the user must click "Copy" in the banner.
   let pendingGuestCopy = $state('');
+
+  // The client is constructed once per panel; the machine it talks about
+  // is whatever the live prop says, so it is handed over on every change
+  // rather than frozen at construction (App.svelte keys the route, but
+  // the persistent host instance proves the pattern can outlive that).
+  const zmodem = new ZmodemClient('');
+  $effect(() => {
+    zmodem.machineId = machineId || '';
+  });
+  const zmodemAvailable = $derived(
+    mode === 'machine' && (machineProtocol === 'telnet' || machineProtocol === 'serial')
+  );
 
   // Synced reactive preferences from central store
   const currentThemeId = $derived(terminalSettings.theme);
@@ -165,7 +193,12 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const prefix = mode === 'host' ? 'host-terminal' : `vm-${vmId || 'serial'}`;
+      const prefix =
+        mode === 'host'
+          ? 'host-terminal'
+          : mode === 'machine'
+            ? `machine-${machineId || 'terminal'}`
+            : `vm-${vmId || 'serial'}`;
       a.href = url;
       a.download = `${prefix}-${ts}.log`;
       a.click();
@@ -218,6 +251,11 @@
         const initialCols = term ? term.cols : 120;
         const initialRows = term ? term.rows : 30;
         url = `${wsBase()}/api/host/terminal?ticket=${encodeURIComponent(r.ticket)}&cols=${initialCols}&rows=${initialRows}`;
+      } else if (mode === 'machine') {
+        const r = await api.getMachineTerminalTicket(machineId);
+        const initialCols = term ? term.cols : 120;
+        const initialRows = term ? term.rows : 30;
+        url = `${wsBase()}/api/ssh-machines/${encodeURIComponent(machineId)}/terminal?ticket=${encodeURIComponent(r.ticket)}&cols=${initialCols}&rows=${initialRows}`;
       } else {
         const r = await api.getConsoleTicket(vmId);
         url = `${wsBase()}/api/vms/${encodeURIComponent(vmId)}/serial?ticket=${encodeURIComponent(r.ticket)}`;
@@ -240,10 +278,27 @@
         status = 'connected';
         showedDisconnect = false;
         failedAttempts = 0;
+        zmodem.bind((frame) => {
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
+        });
         if (term) term.focus();
         fit(sendResize);
       };
       ws.onmessage = (e) => {
+        // Control frames travel as text on the same socket as the
+        // terminal's bytes. Anything that is not JSON — the red dial
+        // errors, for instance — keeps going to the screen untouched.
+        if (typeof e.data === 'string' && e.data.charCodeAt(0) === 0x7b) {
+          try {
+            const body = JSON.parse(e.data);
+            if (body && body.type === 'zmodem') {
+              zmodem.frame(body);
+              return;
+            }
+          } catch {
+            /* not JSON: ordinary terminal text */
+          }
+        }
         if (term) {
           let text = '';
           if (typeof e.data === 'string') {
@@ -268,6 +323,7 @@
         }
       };
       ws.onclose = (event) => {
+        zmodem.bind(null);
         if (event.code === 4409) {
           status = 'closed';
           initTerm();
@@ -449,7 +505,7 @@
   }
 
   function sendResize() {
-    if (mode === 'host' && ws && ws.readyState === WebSocket.OPEN && term) {
+    if (mode !== 'vm' && ws && ws.readyState === WebSocket.OPEN && term) {
       termCols = term.cols;
       termRows = term.rows;
       ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
@@ -465,6 +521,9 @@
 
   function closeWs(socket) {
     if (!socket) return;
+    // The handlers are nulled below, so onclose never runs: unbind here or
+    // a ZMODEM request would be sent into a socket nobody is listening on.
+    zmodem.bind(null);
     socket.onopen = null;
     socket.onmessage = null;
     socket.onclose = null;
@@ -544,6 +603,8 @@
       <span class="text-foreground font-semibold">
         {#if mode === 'host'}
           {t('terminal.hostTitle')}
+        {:else if mode === 'machine'}
+          {t('terminal.machineTitle', { name: machineId })}
         {:else}
           {t('terminal.serialTitle', { cols: VM_COLS, rows: VM_ROWS })}
         {/if}
@@ -551,7 +612,7 @@
       {#if status === 'connecting'}
         <Loader2 class="w-3.5 h-3.5 animate-spin text-primary" />
       {/if}
-      {#if mode === 'host' && status === 'connected'}
+      {#if mode !== 'vm' && status === 'connected'}
         <span class="hidden sm:inline text-[11px] text-muted-foreground/80 font-mono">
           [{termCols}×{termRows}]
         </span>
@@ -657,6 +718,22 @@
       >
         <Clipboard class="w-3.5 h-3.5" />
       </button>
+
+      <!-- ZMODEM download (telnet / serial machines have no SFTP) -->
+      {#if zmodemAvailable}
+        <button
+          type="button"
+          onclick={() => {
+            zmodem.error = '';
+            zmodem.open = true;
+          }}
+          class="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/80 border border-transparent hover:border-border/60 transition-colors"
+          title={t('terminal.zmodem')}
+          aria-label={t('terminal.zmodem')}
+        >
+          <FileDown class="w-3.5 h-3.5" />
+        </button>
+      {/if}
 
       <!-- Download Terminal Log -->
       <button
@@ -843,6 +920,10 @@
         {t('terminal.guestCopyDismiss')}
       </button>
     </div>
+  {/if}
+
+  {#if zmodemAvailable}
+    <ZmodemPanel client={zmodem} />
   {/if}
 
   <!-- Terminal Screen Container -->

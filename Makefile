@@ -1,4 +1,4 @@
-.PHONY: all install-deps build build-cli run dev stop clean install uninstall update status logs install-systemd install-systemd-force install-caddy install-all regen-cert rollback docker-build
+.PHONY: all install-deps fmt fmt-check build build-cli run dev stop clean install uninstall update status logs install-systemd install-systemd-force install-caddy install-all regen-cert rollback docker-build
 
 # F12-02: recipes below use bash-only syntax (`read ... <<< "$$(...)"`,
 # a here-string). make(1) runs recipes with /bin/sh regardless of the
@@ -72,6 +72,22 @@ install-deps:
 	echo "Enabling libvirtd..."; \
 	sudo systemctl enable --now libvirtd; \
 	echo "Done!"
+
+# ---- Quality ----
+
+# fmt rewrites the Go sources in place. The non-empty guard matters: the
+# obvious `gofmt -w $$(gofmt -l .)` degenerates to a bare `gofmt -w` on a
+# tree that is already clean, and gofmt then reads stdin and hangs make.
+fmt:
+	@cd backend && files="$$(gofmt -l .)"; \
+	if [ -n "$$files" ]; then gofmt -w $$files && echo "gofmt: formatted"; else echo "gofmt: clean"; fi
+
+# fmt-check is the gate CI runs (ci.yml, backend job): it fails and lists
+# the offenders rather than silently leaving them to the next reader.
+fmt-check:
+	@cd backend && files="$$(gofmt -l .)"; \
+	if [ -n "$$files" ]; then echo "gofmt needed:"; echo "$$files"; exit 1; fi; \
+	echo "gofmt: clean"
 
 # ---- Build ----
 

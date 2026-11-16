@@ -58,9 +58,10 @@
   // snapshot — nothing to see there on a fresh install. Checked once
   // here (not on every navigation); Snapshots.svelte's own load()
   // refreshes the same store, so visiting it directly self-heals this.
-  onMount(() => {
-    if (!fleetSnapshots.checked) checkFleetSnapshots(api.listAllSnapshots);
-
+  // The badge can only go stale by missing a vm.state event — the hub
+  // never replays what the socket missed — so the (re)open is the
+  // resync point: re-list on it, exactly like on a live state event.
+  function refreshRunningCount() {
     api
       .listVMs()
       .then((vms) => {
@@ -69,6 +70,12 @@
         }
       })
       .catch(() => {});
+  }
+
+  onMount(() => {
+    if (!fleetSnapshots.checked) checkFleetSnapshots(api.listAllSnapshots);
+
+    refreshRunningCount();
 
     api
       .hostMetrics()
@@ -82,16 +89,7 @@
       })
       .catch(() => {});
 
-    const offState = events.onVmState(() => {
-      api
-        .listVMs()
-        .then((vms) => {
-          if (Array.isArray(vms)) {
-            runningCount = vms.filter((v) => v.state === 'running').length;
-          }
-        })
-        .catch(() => {});
-    });
+    const offState = events.onVmState(refreshRunningCount);
 
     const offHost = events.onHostMetrics((data) => {
       if (data && data.total_disk > 0) {
@@ -99,9 +97,12 @@
       }
     });
 
+    const offOpen = events.onOpen(refreshRunningCount);
+
     return () => {
       offState?.();
       offHost?.();
+      offOpen?.();
     };
   });
 
@@ -116,6 +117,13 @@
           path: '/vms',
           labelKey: 'nav.vms',
           icon: 'computer',
+          roles: ['admin', 'operator', 'viewer'],
+        },
+        {
+          id: 'machines',
+          path: '/machines',
+          labelKey: 'nav.machines',
+          icon: 'server',
           roles: ['admin', 'operator', 'viewer'],
         },
         {
@@ -207,13 +215,6 @@
           path: '/settings',
           labelKey: 'nav.settings',
           icon: 'settings',
-          roles: ['admin'],
-        },
-        {
-          id: 'host-console',
-          path: '/host-console',
-          labelKey: 'nav.hostTerminal',
-          icon: 'terminal',
           roles: ['admin'],
         },
       ],
@@ -318,6 +319,13 @@
     if (
       id === 'vms' &&
       (route.name === 'vms' || route.name === 'vm-detail' || route.name === 'vms-new')
+    )
+      return true;
+    if (
+      id === 'machines' &&
+      (route.name === 'machines' ||
+        route.name === 'machine-detail' ||
+        route.name === 'machines-new')
     )
       return true;
     return route.name === id;

@@ -392,12 +392,17 @@
         load(true);
       }
     });
+    // The socket never replays what it missed: a shutoff that landed
+    // while the SSE was down would leave this page's state stale until
+    // a remount. A silent refetch on every (re)open heals it.
+    const offOpen = events.onOpen(() => load(true));
     let unsubscribed = false;
     unsubscribeEvents = () => {
       if (unsubscribed) return;
       unsubscribed = true;
       off();
       offMetrics();
+      offOpen();
     };
     return unsubscribeEvents;
   });

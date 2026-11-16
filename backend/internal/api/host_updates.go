@@ -35,14 +35,14 @@ type HostUpdatesSummary struct {
 }
 
 var (
-	updatesMu          sync.Mutex
-	cachedUpdates      *HostUpdatesSummary
-	lastCheckedTime    time.Time
-	isUpgradingHost    bool
-	isRefreshingHost   bool
-	upgradableLineRE   = regexp.MustCompile(`^([a-zA-Z0-9.+~-]+)/([^\s/]+)\s+(\S+)\s+(\S+)\s+\[(?:upgradable from|actualizable desde):\s+([^\]]+)\]`)
-	unpackingPkgRE     = regexp.MustCompile(`(?:Unpacking|Preparando para desempaquetar|Desempaquetando)\s+([a-zA-Z0-9.+~-]+)`)
-	settingUpPkgRE     = regexp.MustCompile(`(?:Setting up|Configurando)\s+([a-zA-Z0-9.+~-]+)`)
+	updatesMu        sync.Mutex
+	cachedUpdates    *HostUpdatesSummary
+	lastCheckedTime  time.Time
+	isUpgradingHost  bool
+	isRefreshingHost bool
+	upgradableLineRE = regexp.MustCompile(`^([a-zA-Z0-9.+~-]+)/([^\s/]+)\s+(\S+)\s+(\S+)\s+\[(?:upgradable from|actualizable desde):\s+([^\]]+)\]`)
+	unpackingPkgRE   = regexp.MustCompile(`(?:Unpacking|Preparando para desempaquetar|Desempaquetando)\s+([a-zA-Z0-9.+~-]+)`)
+	settingUpPkgRE   = regexp.MustCompile(`(?:Setting up|Configurando)\s+([a-zA-Z0-9.+~-]+)`)
 )
 
 type PkgManager string

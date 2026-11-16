@@ -40,6 +40,19 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
 
+      # Format before anything expensive: this step needs neither the
+      # libvirt headers nor the frontend artifact, so a stray un-aligned
+      # struct fails in seconds instead of surfacing only after the apt
+      # install, the artifact download, golangci-lint and the race suite.
+      - name: gofmt check
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt (run: make fmt):"
+            echo "$unformatted"
+            exit 1
+          fi
+
       # libvirt headers aren't installed by default in GitHub Actions
       # runners. The packages that import libvirt.org/go/libvirt
       # only need the C headers at build time when CGO is enabled.

@@ -50,6 +50,17 @@ const ROUTES = [
   { pattern: 'vms', name: 'vms' },
   { pattern: 'vms/new', name: 'vms-new' },
   { pattern: 'vms/:id', name: 'vm-detail' },
+  { pattern: 'machines', name: 'machines' },
+  { pattern: 'machines/new', name: 'machines-new' },
+  // The built-in host terminal is machine "host" (admin-only), not a
+  // dynamic id — the static pattern must win over machines/:id.
+  {
+    pattern: 'machines/host',
+    name: 'machine-detail',
+    roles: ['admin'],
+    staticParams: { id: 'host' },
+  },
+  { pattern: 'machines/:id', name: 'machine-detail' },
   { pattern: 'apps', name: 'apps' },
   { pattern: 'images', name: 'images' },
   { pattern: 'multiview', name: 'multiview', roles: ['admin', 'operator'] },
@@ -63,7 +74,6 @@ const ROUTES = [
   { pattern: 'nodes', name: 'nodes', roles: ['admin'] },
   { pattern: 'snapshots', name: 'snapshots' },
   { pattern: 'system', name: 'system', roles: ['admin', 'operator'] },
-  { pattern: 'host-console', name: 'host-console', roles: ['admin'] },
   { pattern: 'settings', name: 'settings', roles: ['admin'] },
   { pattern: 'account', name: 'account' },
 ];
@@ -104,7 +114,13 @@ function parseHash() {
       }
     }
     if (match) {
-      return { name: r.name, path: pathname, params, query, roles: r.roles || null };
+      return {
+        name: r.name,
+        path: pathname,
+        params: { ...(r.staticParams || {}), ...params },
+        query,
+        roles: r.roles || null,
+      };
     }
   }
 

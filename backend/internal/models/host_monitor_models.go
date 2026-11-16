@@ -6,23 +6,23 @@ import "time"
 // covering all resource dimensions: system, CPU, memory, network, disk,
 // accelerators (GPU/NPU), processes, docker, and logged-in users.
 type HostMetricsResponse struct {
-	System          SystemInfo        `json:"system"`
-	CPU             CPUInfo           `json:"cpu"`
-	Load            LoadInfo          `json:"load"`
-	Memory          MemoryInfo        `json:"memory"`
-	Swap            SwapInfo          `json:"swap"`
-	Networks        []NetworkInfo     `json:"networks"`
-	NetworkSummary  NetworkSummary    `json:"network_summary"`
-	Disks           []HostDiskInfo    `json:"disks"`
-	DiskGroups      []DiskGroup       `json:"disk_groups"`
-	GPU             *GPUInfo          `json:"gpu,omitempty"`
-	NPU             *NPUInfo          `json:"npu,omitempty"`
-	Processes       []ProcessInfo     `json:"processes,omitempty"`
-	Docker          *DockerInfo       `json:"docker,omitempty"`
-	Users           []UserInfo        `json:"users,omitempty"`
-	History         MetricsHistory    `json:"history"`
-	SampledAt       time.Time         `json:"sampled_at"`
-	ExtendedCachedAt *time.Time       `json:"extended_cached_at,omitempty"` // When extended data (GPU/Docker/NPU/Users) was last refreshed; nil if not cached
+	System           SystemInfo     `json:"system"`
+	CPU              CPUInfo        `json:"cpu"`
+	Load             LoadInfo       `json:"load"`
+	Memory           MemoryInfo     `json:"memory"`
+	Swap             SwapInfo       `json:"swap"`
+	Networks         []NetworkInfo  `json:"networks"`
+	NetworkSummary   NetworkSummary `json:"network_summary"`
+	Disks            []HostDiskInfo `json:"disks"`
+	DiskGroups       []DiskGroup    `json:"disk_groups"`
+	GPU              *GPUInfo       `json:"gpu,omitempty"`
+	NPU              *NPUInfo       `json:"npu,omitempty"`
+	Processes        []ProcessInfo  `json:"processes,omitempty"`
+	Docker           *DockerInfo    `json:"docker,omitempty"`
+	Users            []UserInfo     `json:"users,omitempty"`
+	History          MetricsHistory `json:"history"`
+	SampledAt        time.Time      `json:"sampled_at"`
+	ExtendedCachedAt *time.Time     `json:"extended_cached_at,omitempty"` // When extended data (GPU/Docker/NPU/Users) was last refreshed; nil if not cached
 }
 
 // SystemInfo contains basic system identification.
@@ -109,32 +109,32 @@ type HostDiskInfo struct {
 // DiskGroup represents a physical disk with one or more partitions.
 // Structure: Physical Disk → Partitions → Mount Points
 type DiskGroup struct {
-	Device        string       `json:"device"`         // Physical disk name (e.g., "/dev/sda")
-	TotalBytes    uint64       `json:"total_bytes"`    // Sum of all partition totals
-	UsedBytes     uint64       `json:"used_bytes"`     // Sum of all partition usage
-	UsagePercent  float64      `json:"usage_percent"`  // Calculated from totals
-	ReadBytesSec  float64      `json:"read_bytes_per_sec"`
-	WriteBytesSec float64      `json:"write_bytes_per_sec"`
-	Partitions    []Partition  `json:"partitions"`     // Partitions on this disk
+	Device        string      `json:"device"`        // Physical disk name (e.g., "/dev/sda")
+	TotalBytes    uint64      `json:"total_bytes"`   // Sum of all partition totals
+	UsedBytes     uint64      `json:"used_bytes"`    // Sum of all partition usage
+	UsagePercent  float64     `json:"usage_percent"` // Calculated from totals
+	ReadBytesSec  float64     `json:"read_bytes_per_sec"`
+	WriteBytesSec float64     `json:"write_bytes_per_sec"`
+	Partitions    []Partition `json:"partitions"` // Partitions on this disk
 }
 
 // Partition represents a disk partition with one or more mount points.
 type Partition struct {
-	Device       string       `json:"device"`        // Partition device (e.g., "/dev/sda1")
-	TotalBytes   uint64       `json:"total_bytes"`
-	UsedBytes    uint64       `json:"used_bytes"`
-	UsagePercent float64      `json:"usage_percent"`
-	ReadBytesSec float64      `json:"read_bytes_per_sec"`
-	WriteBytesSec float64     `json:"write_bytes_per_sec"`
-	Mounts       []MountPoint `json:"mounts"`        // Mount points for this partition
+	Device        string       `json:"device"` // Partition device (e.g., "/dev/sda1")
+	TotalBytes    uint64       `json:"total_bytes"`
+	UsedBytes     uint64       `json:"used_bytes"`
+	UsagePercent  float64      `json:"usage_percent"`
+	ReadBytesSec  float64      `json:"read_bytes_per_sec"`
+	WriteBytesSec float64      `json:"write_bytes_per_sec"`
+	Mounts        []MountPoint `json:"mounts"` // Mount points for this partition
 }
 
 // MountPoint represents a single mount point.
 type MountPoint struct {
-	Path       string  `json:"path"`        // Mount point path (e.g., "/", "/boot")
-	FSType     string  `json:"fs_type"`     // Filesystem type
-	TotalBytes uint64  `json:"total_bytes"`
-	UsedBytes  uint64  `json:"used_bytes"`
+	Path         string  `json:"path"`    // Mount point path (e.g., "/", "/boot")
+	FSType       string  `json:"fs_type"` // Filesystem type
+	TotalBytes   uint64  `json:"total_bytes"`
+	UsedBytes    uint64  `json:"used_bytes"`
 	UsagePercent float64 `json:"usage_percent"`
 }
 
@@ -174,24 +174,24 @@ type GPUProcess struct {
 
 // NPUInfo contains Ascend NPU monitoring data.
 type NPUInfo struct {
-	Available     bool        `json:"available"`
-	DriverVersion string      `json:"driver_version"`
-	CannVersion   string      `json:"cann_version"`
-	NPUs          []NPUDevice `json:"npus"`
+	Available     bool         `json:"available"`
+	DriverVersion string       `json:"driver_version"`
+	CannVersion   string       `json:"cann_version"`
+	NPUs          []NPUDevice  `json:"npus"`
 	Processes     []NPUProcess `json:"processes,omitempty"`
 }
 
 // NPUDevice represents a single Ascend NPU device.
 type NPUDevice struct {
-	Index          uint32   `json:"index"`
-	Name           string   `json:"name"`
-	Health         string   `json:"health"`
-	TemperatureC   *float64 `json:"temperature_c"`
-	UtilAICore     *float64 `json:"utilization_aicore_percent"`
-	UtilMemory     *float64 `json:"utilization_memory_percent"`
-	MemoryTotalMB  uint64   `json:"memory_total_mb"`
-	MemoryUsedMB   uint64   `json:"memory_used_mb"`
-	PowerDrawW     *float64 `json:"power_draw_w"`
+	Index         uint32   `json:"index"`
+	Name          string   `json:"name"`
+	Health        string   `json:"health"`
+	TemperatureC  *float64 `json:"temperature_c"`
+	UtilAICore    *float64 `json:"utilization_aicore_percent"`
+	UtilMemory    *float64 `json:"utilization_memory_percent"`
+	MemoryTotalMB uint64   `json:"memory_total_mb"`
+	MemoryUsedMB  uint64   `json:"memory_used_mb"`
+	PowerDrawW    *float64 `json:"power_draw_w"`
 }
 
 // NPUProcess represents a process using NPU resources.
@@ -204,15 +204,15 @@ type NPUProcess struct {
 
 // ProcessInfo represents a running process.
 type ProcessInfo struct {
-	PID     uint32  `json:"pid"`
-	PPID    uint32  `json:"ppid"`
-	User    string  `json:"user"`
-	State   string  `json:"state"`
-	CPU     float64 `json:"cpu_percent"`
-	Memory  float64 `json:"memory_percent"`
-	RSSBytes uint64 `json:"rss_bytes"`
-	Elapsed string  `json:"elapsed"`
-	Command string  `json:"command"`
+	PID      uint32  `json:"pid"`
+	PPID     uint32  `json:"ppid"`
+	User     string  `json:"user"`
+	State    string  `json:"state"`
+	CPU      float64 `json:"cpu_percent"`
+	Memory   float64 `json:"memory_percent"`
+	RSSBytes uint64  `json:"rss_bytes"`
+	Elapsed  string  `json:"elapsed"`
+	Command  string  `json:"command"`
 }
 
 // DockerInfo contains Docker daemon monitoring data.
@@ -240,13 +240,13 @@ type DockerContainer struct {
 
 // DockerImage represents a Docker image.
 type DockerImage struct {
-	ID          string   `json:"id"`
-	Repository  string   `json:"repository"`
-	Tag         string   `json:"tag"`
-	Size        int64    `json:"size"`
-	CreatedAt   string   `json:"created_at"`
-	CreatedSince string  `json:"created_since"`
-	Containers  int      `json:"containers"`
+	ID           string `json:"id"`
+	Repository   string `json:"repository"`
+	Tag          string `json:"tag"`
+	Size         int64  `json:"size"`
+	CreatedAt    string `json:"created_at"`
+	CreatedSince string `json:"created_since"`
+	Containers   int    `json:"containers"`
 }
 
 // UserInfo represents a logged-in user session.
@@ -260,8 +260,8 @@ type UserInfo struct {
 
 // MetricsHistory contains time-series history for charting.
 type MetricsHistory struct {
-	CPU      []HistoryPoint                `json:"cpu"`
-	Memory   []HistoryPoint                `json:"memory"`
+	CPU      []HistoryPoint                   `json:"cpu"`
+	Memory   []HistoryPoint                   `json:"memory"`
 	Networks map[string][]NetworkHistoryPoint `json:"networks"`
 	Disks    map[string][]DiskHistoryPoint    `json:"disks"`
 }

@@ -30,6 +30,9 @@
     vms: () => import('./routes/VmList.svelte'),
     'vms-new': () => import('./routes/VmCreate.svelte'),
     'vm-detail': () => import('./routes/VmDetail.svelte'),
+    machines: () => import('./routes/MachinesList.svelte'),
+    'machines-new': () => import('./routes/MachineCreate.svelte'),
+    'machine-detail': () => import('./routes/MachineDetail.svelte'),
     apps: () => import('./routes/AppStore.svelte'),
     images: () => import('./routes/ImageHub.svelte'),
     multiview: () => import('./routes/MultiView.svelte'),
@@ -43,7 +46,7 @@
     firewall: () => import('./routes/Firewall.svelte'),
     audit: () => import('./routes/AuditLog.svelte'),
     system: () => import('./routes/System.svelte'),
-    // NOTE: 'host-console' is deliberately absent — it's rendered
+    // NOTE: the built-in host machine (#/machines/host) is rendered
     // separately below so its shell session survives navigation.
     settings: () => import('./routes/Settings.svelte'),
     account: () => import('./routes/Account.svelte'),
@@ -92,10 +95,10 @@
       .catch((err) => (loadError = err));
   }
 
-  // The Host Console is kept MOUNTED (just visually hidden) once the
-  // admin has opened it, so navigating away and back doesn't kill the
-  // shell session — that's why it can't go through `routeLoaders`,
-  // which swaps a single PageComponent per route.
+  // The built-in host machine is kept MOUNTED (just visually hidden)
+  // once the admin has opened it, so navigating away and back doesn't
+  // kill the host shell session — that's why it can't go through
+  // `routeLoaders`, which swaps a single PageComponent per route.
   //
   // It is, however, still loaded lazily: importing it eagerly pulled
   // @xterm/xterm plus its five addons (~250 kB) into the initial
@@ -103,15 +106,18 @@
   // terminal. Resolving it on first visit keeps the terminal stack out
   // of the critical path while preserving the persistent-session
   // behaviour from then on.
-  let HostConsoleComponent = $state(null);
+  const isHostMachineRoute = $derived(
+    route.name === 'machine-detail' && route.params?.id === 'host'
+  );
+  let HostMachineComponent = $state(null);
   $effect(() => {
-    if (HostConsoleComponent) return; // already resolved — keep it mounted
-    if (route.name !== 'host-console') return;
+    if (HostMachineComponent) return; // already resolved — keep it mounted
+    if (!isHostMachineRoute) return;
     if (!auth.isLoggedIn || auth.role !== 'admin') return;
     let cancelled = false;
-    import('./routes/HostConsole.svelte')
+    import('./routes/MachineDetail.svelte')
       .then((m) => {
-        if (!cancelled) HostConsoleComponent = m.default;
+        if (!cancelled) HostMachineComponent = m.default;
       })
       .catch((err) => {
         if (!cancelled) loadError = err;
@@ -119,6 +125,11 @@
     return () => {
       cancelled = true;
     };
+  });
+
+  // Old #/host-console bookmarks land on the built-in machine page.
+  $effect(() => {
+    if (route.path === '/host-console') navigate('/machines/host');
   });
 
   // V13-SEC-01: the session is a cookie, so on load we re-validate it
@@ -195,15 +206,15 @@
   </Layout>
 {:else}
   <Layout>
-    {#if auth.isLoggedIn && auth.role === 'admin' && HostConsoleComponent}
-      <div class={route.name === 'host-console' ? 'block h-full' : 'hidden'}>
-        <HostConsoleComponent />
+    {#if auth.isLoggedIn && auth.role === 'admin' && HostMachineComponent}
+      <div class={isHostMachineRoute ? 'block h-full' : 'hidden'}>
+        <HostMachineComponent machineId="host" />
       </div>
-    {:else if route.name === 'host-console' && auth.isLoggedIn && auth.role === 'admin'}
+    {:else if isHostMachineRoute && auth.isLoggedIn && auth.role === 'admin'}
       <div class="flex items-center justify-center py-24"><Spinner size="lg" /></div>
     {/if}
 
-    {#if route.name !== 'host-console'}
+    {#if !isHostMachineRoute}
       {#key route.name + (route.params.id || '')}
         <!-- 200ms matches --motion-slow (app.css): a full route swap is the
              largest-surface transition in the app. -->

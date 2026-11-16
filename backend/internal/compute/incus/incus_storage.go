@@ -510,4 +510,3 @@ func (b *IncusBackend) RefreshCIFSSecretIfNeeded(ctx context.Context, poolName s
 }
 
 // --- Networking ---
-

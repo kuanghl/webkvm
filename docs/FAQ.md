@@ -102,7 +102,7 @@ Instead of downloading ISOs and clicking through OS installers, the Image Hub le
 ## 6. WebGL Terminal & Consoles
 
 ### Why does the Host Terminal prompt for system login?
-For strict security and multi-user administration, WebKVM executes `/bin/login -p` over a secure PTY rather than opening an unauthenticated root shell. You must authenticate using valid Linux system user credentials, preventing unauthorized browser access.
+For strict security and multi-user administration, WebKVM executes `/bin/login -p` over a secure PTY rather than opening an unauthenticated root shell. You must authenticate using valid Linux system user credentials, preventing unauthorized browser access. If you store an account and a password on the **Local** machine card (Settings, admin only), the terminal signs in by itself once at the prompt — and if the login is rejected, the prompt is handed back to you exactly as it would be with no credentials stored.
 
 ### Why do TUI tools like `btop`, `htop`, `mc`, and `nano` work smoothly?
 1. **TrueColor & UTF-8**: The PTY environment enforces `TERM=xterm-256color`, `COLORTERM=truecolor`, and `LANG=C.UTF-8`.

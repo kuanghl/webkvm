@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { mount, unmount, flushSync } from 'svelte';
 
 vi.mock('$lib/stores/auth.svelte.js', () => {
@@ -33,6 +33,25 @@ vi.mock('$lib/stores/auth.svelte.js', () => {
       getHostPCIPreflight: () => Promise.resolve({ supported: true }),
       getHostUpdates: () => Promise.resolve({ updates: [] }),
       getHostInfo: () => Promise.resolve({ pools_dir: '/opt/webkvm/pools' }),
+      // MachineDetail renders from this record; the Proxy fallback would
+      // hand it an empty array and every field lookup would be undefined.
+      getMachine: () =>
+        Promise.resolve({
+          id: 'm-1',
+          name: 'test-machine',
+          protocol: 'telnet',
+          host: '10.0.0.1',
+          port: 23,
+          user: 'root',
+          auth_type: 'password',
+          notes: '',
+          host_key: '',
+          has_password: true,
+          has_key: false,
+          builtin: false,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        }),
       getHostStats: () => Promise.resolve({}),
       getSystemStatus: () =>
         Promise.resolve({
@@ -88,7 +107,7 @@ const settle = async () => {
   }
 };
 
-describe('Frontend: all 22 routes mount without unhandled errors', () => {
+describe('Frontend: all 23 routes mount without unhandled errors', () => {
   let target, app;
 
   beforeEach(() => {
@@ -120,11 +139,23 @@ describe('Frontend: all 22 routes mount without unhandled errors', () => {
     { name: 'Backup', loader: () => import('../routes/Backup.svelte') },
     { name: 'Firewall', loader: () => import('../routes/Firewall.svelte') },
     { name: 'AuditLog', loader: () => import('../routes/AuditLog.svelte') },
-    { name: 'Status', loader: () => import('../routes/Status.svelte') },
+    { name: 'System', loader: () => import('../routes/System.svelte') },
     { name: 'Settings', loader: () => import('../routes/Settings.svelte') },
     { name: 'Account', loader: () => import('../routes/Account.svelte') },
-    { name: 'HostConsole', loader: () => import('../routes/HostConsole.svelte') },
+    { name: 'MachinesList', loader: () => import('../routes/MachinesList.svelte') },
+    { name: 'MachineCreate', loader: () => import('../routes/MachineCreate.svelte') },
+    { name: 'MachineDetail', loader: () => import('../routes/MachineDetail.svelte') },
   ];
+
+  // Pay the one-time transform+eval cost of every route chunk up front:
+  // on a loaded machine the cold import of the shared graph (i18n, lucide,
+  // bits-ui) can exceed a single test's timeout, which would fail the
+  // first routes of the file for nothing to do with mounting. With the
+  // modules warm, the per-test timeout guards mount+settle only, as
+  // intended.
+  beforeAll(async () => {
+    await Promise.all(routes.map((r) => r.loader()));
+  }, 180000);
 
   for (const r of routes) {
     it(`mounts route: ${r.name}`, async () => {

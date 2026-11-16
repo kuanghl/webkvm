@@ -539,6 +539,14 @@ func ticketAllowedPath(path string) bool {
 			return true
 		}
 	}
+	// SSH Machines terminal WebSocket (?ticket=, same single-use
+	// mechanism as the VM serial console above).
+	if strings.HasPrefix(path, "/api/ssh-machines/") {
+		rest := strings.TrimPrefix(path, "/api/ssh-machines/")
+		if strings.HasSuffix(rest, "/terminal") && strings.Count(rest, "/") == 1 {
+			return true
+		}
+	}
 	return false
 }
 

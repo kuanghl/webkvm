@@ -891,7 +891,17 @@ func main() {
 		})
 	}
 
-	router := api.NewRouter(cfg, lv, computeBackend, authMgr, globalRateLimiter, loginLimiter, jail, userStore, hub, metrics, hostMetrics, auditLogger, settingsStore, tokensStore, nodesReg, backupStore, backupRunner, notifier, fwStore, fwMgr, vmSchedStore, vmScheduler, metricHist, alerter, incusMetrics)
+	router, apiHandler := api.NewRouter(cfg, lv, computeBackend, authMgr, globalRateLimiter, loginLimiter, jail, userStore, hub, metrics, hostMetrics, auditLogger, settingsStore, tokensStore, nodesReg, backupStore, backupRunner, notifier, fwStore, fwMgr, vmSchedStore, vmScheduler, metricHist, alerter, incusMetrics)
+
+	// Orphaned SSH transfer files: a crash between a spool and its
+	// publish leaves files nobody will fetch again. The job table is
+	// empty by definition this early, so both staging areas can be
+	// cleared unconditionally.
+	if n, err := apiHandler.Startup(); err != nil {
+		slog.Warn("ssh_transfer_sweep_failed", "err", err.Error())
+	} else if n > 0 {
+		slog.Info("ssh_transfer_orphans_swept", "count", n)
+	}
 
 	srv := &http.Server{
 		Addr:    net.JoinHostPort(cfg.BindAddr, fmt.Sprintf("%d", cfg.Port)),
@@ -1038,6 +1048,10 @@ func main() {
 
 	// Release the auth Manager's background GC goroutine (token blacklist).
 	authMgr.Close()
+
+	// Stop the SSH-machines SFTP session GC and cancel in-flight file
+	// transfers before we start tearing down HTTP.
+	apiHandler.Close()
 
 	// Disconnect SSE clients BEFORE waiting on the server.
 	//

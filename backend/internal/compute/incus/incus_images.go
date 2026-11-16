@@ -1310,4 +1310,3 @@ func mergeLocalImages(catalog []models.IncusImageItem, localImages []api.Image) 
 
 	return catalog
 }
-

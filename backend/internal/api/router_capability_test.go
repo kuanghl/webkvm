@@ -24,11 +24,12 @@ func realRouterRoutes(t *testing.T) map[string]bool {
 	authMgr := auth.NewManager("router-capability-test-secret", nil)
 	t.Cleanup(authMgr.Close)
 
-	r := NewRouter(
+	r, h := NewRouter(
 		&config.Config{DataDir: t.TempDir()},
 		nil, nil, authMgr, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
+	t.Cleanup(h.Close)
 
 	out := map[string]bool{}
 	if err := chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {

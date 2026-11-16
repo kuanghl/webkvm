@@ -1081,4 +1081,3 @@ func writeTarEntry(tw *tar.Writer, name string, data []byte, mode int64) error {
 	}
 	return nil
 }
-

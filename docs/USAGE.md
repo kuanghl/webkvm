@@ -302,3 +302,104 @@ cat /opt/webkvm/logs/backend.log  # when WEBKVM_LOG_FILE is enabled
 | Can't connect to libvirt | Check `systemctl status libvirtd`; backend runs as root |
 | Can't create a VM from ISO | Upload the ISO in **Storage** first, then attach it |
 | Serial console says VM is off | Start the VM; the console reconnects automatically on next attempt |
+| Machine stays **Awaiting trust** | Open it and confirm the SSH host key fingerprint |
+| ZMODEM reports no answer from the machine | Install `lrzsz` on the machine (`apt install lrzsz`) |
+
+## 12. Remote machines (SSH, Telnet, serial)
+
+**Remote Access** (`#/machines`) registers the hosts you want to work with from
+the browser: **SSH** (password or private key), **Telnet** (host + port) or a
+**serial** line (`/dev/ttyUSB0` + baud rate). Each machine gets a terminal, and
+SSH machines also get a file browser. Your own host is listed as the built-in
+**Local** machine, so its shell — and its filesystem — are one click away too;
+browsing it is admin-only, because those reads and writes run with WebKVM's own
+privileges. **Mosh** records can be created for the future, but this build has
+no Mosh support: the terminal refuses to open one, so use SSH.
+
+| Action | Who |
+|--------|-----|
+| Add / edit / delete a machine, pin a host key, test the link | `operator` and above |
+| Open a terminal, browse files, transfer | the `console` capability (a viewer with an explicit grant included) |
+| Browse or transfer on the built-in **Local** machine | `admin` only |
+
+Passwords and private keys stay server-side under `/opt/webkvm` and are never
+sent back to the browser: the API only reports `has_password` / `has_key`.
+Deleting a machine removes its record and its stored credentials; nothing on the
+remote host is touched.
+
+The first connection to an SSH host shows its key fingerprint and does nothing
+else until you confirm it. A later change of key is an error, not a prompt —
+check the fingerprint out-of-band before pinning again.
+
+The built-in **Local** machine can also store an account and a password, from
+its **Settings** tab (admin only): with both stored, the host terminal signs
+itself in — it types the password once at the login prompt and, if the host
+rejects it, the prompt is handed back to you exactly as before, never a second
+guess — and a **Test** button verifies the stored pair against this machine's
+own login. There is no host key to pin on the local card: a getty login has no
+key half, so the pin flow does not apply to it.
+
+### Files (the **Files** tab of a machine)
+
+The tab opens on the machine's own folder. **Transfer** brings up the second
+pane, aimed at another machine; then select in one pane and use **Copy to
+<name>**, or drag a selection across. Machine → machine copies are streamed
+directly between the two hosts: the bytes do not pass through the WebKVM host
+or the browser. The built-in **Local** machine is browsable and can be either
+end of a copy.
+
+- Folders are recursive: up to 32 levels deep and 20 000 entries per job.
+- The last crumb is a path bar: type an absolute path or a name relative to
+  the current folder and Enter jumps. Rows have checkboxes (the header has a
+  select-all, like Ctrl+A) — what you tick is what gets copied or downloaded —
+  and folders show a size from a bounded background probe (`≈` when the probe
+  stopped early). A folder button uploads a whole tree, and several selected
+  entries download as one job and one `tar.gz`.
+- Writes are atomic — the destination sees `name` only when the last byte
+  arrived, so a canceled or failed copy leaves no partial file behind.
+- Symlinks are re-created as links (never followed), empty folders are kept,
+  mode and mtime are preserved, and fifos/sockets/devices are skipped and
+  counted in the job instead of hanging it.
+- A finished folder download is served as `.tar.gz`, and a finished single-file
+  download arrives in the browser on its own — you do not have to click the
+  queue row a second time.
+- **Transfers** (under the panes) keeps one row per action with per-file
+  progress, speed and ETA; a running job can be **paused** (it parks between
+  chunks and resumes where it stopped) and cancel stops the worker and removes
+  what is still in flight — cancel works from paused, too. Progress arrives on
+  the same SSE channel as the rest of the UI — nothing polls.
+- Download results are cached under `/opt/webkvm/ssh-transfers` (the last 50
+  finished jobs; removing a row deletes its cache).
+
+### ZMODEM for Telnet and serial machines
+
+Telnet and serial links have no SFTP channel, so files ride the terminal
+itself, in either direction. In the machine terminal, **Move files over ZMODEM
+(sz/rz)** opens a dialog with two tabs.
+
+**Receive from the machine (`sz`)**: write the paths on the machine (one per
+line; the remote shell expands `*` and `?`), tick **Include directory contents
+(`sz -r`)** for folders, then **Send sz**. WebKVM runs `sz` on the remote,
+receives the batch through the terminal and files it as an ordinary transfer, so
+the queue and the download link behave exactly as they do over SSH.
+
+**Send to the machine (`rz`)**: pick or drop up to 32 files, then **Send rz**.
+The batch is held on the WebKVM host first, because a serial line cannot pause
+to negotiate a second stream while you type; the terminal then plays the
+sender's role until the remote's `rz` has taken it. The queue shows one upload
+row with the same progress and cancel as any other transfer.
+
+- The remote needs `lrzsz` for either direction. If it does not answer within a
+  few seconds the terminal is released again and says so.
+- The protocol is only armed when you press the button: nothing is sniffed out
+  of the terminal stream, and any key you typed while waiting is replayed
+  untouched.
+- `sz` cannot carry permissions or timestamps, so a recursive download keeps
+  names and contents only.
+- `rz` writes into whatever directory the remote shell is sitting in, so `cd`
+  there first. A dropped folder arrives flattened to one name per file, and a
+  name that already exists is renamed by `rz -E` (`notes.txt.0`) rather than
+  overwritten or asked about: nobody is watching the terminal to answer.
+- A staged batch that no terminal claims is thrown away after 15 minutes, and
+  an SSH machine refuses the whole detour in favour of its **Files** tab.
+- One ZMODEM session per terminal; the terminal has to stay open while it runs.

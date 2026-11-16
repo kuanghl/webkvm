@@ -102,7 +102,7 @@ En lugar de descargar ISOs interactivas, el Image Hub permite almacenar imágene
 ## 6. Terminal WebGL y Consolas
 
 ### ¿Por qué la terminal del host solicita login del sistema?
-Por seguridad y control de accesos, WebKVM ejecuta `/bin/login -p` en un pseudo-terminal PTY protegido en lugar de abrir una shell root directa sin autenticar. Es necesario ingresar credenciales válidas de un usuario del sistema Linux.
+Por seguridad y control de accesos, WebKVM ejecuta `/bin/login -p` en un pseudo-terminal PTY protegido en lugar de abrir una shell root directa sin autenticar. Es necesario ingresar credenciales válidas de un usuario del sistema Linux. Si guardas una cuenta y una contraseña en la tarjeta de la máquina **Local** (Settings, solo admin), la terminal inicia sesión sola una vez en el prompt —y si el login se rechaza, el prompt te vuelve tal cual, como si no hubiera credenciales guardadas.
 
 ### ¿Por qué funcionan de forma fluida `btop`, `htop`, `mc` y `nano`?
 1. **Entorno TrueColor y UTF-8**: El PTY define `TERM=xterm-256color`, `COLORTERM=truecolor` y `LANG=C.UTF-8`.

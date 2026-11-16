@@ -46,6 +46,9 @@
     vms: () => t('vms.title'),
     'vms-new': () => t('vms.create'),
     'vm-detail': () => t('vmDetail.overview'),
+    machines: () => t('machines.title'),
+    'machines-new': () => t('machines.create'),
+    'machine-detail': () => t('machines.detail'),
     storage: () => t('storage.title'),
     networks: () => t('networks.title'),
     users: () => t('users.title'),
@@ -63,7 +66,6 @@
     media: () => t('nav.media'),
     audit: () => t('nav.audit'),
     multiview: () => t('nav.multiview'),
-    'host-console': () => t('nav.hostTerminal'),
     'not-found': () => t('common.notFound'),
     'access-denied': () => t('common.accessDenied'),
   };

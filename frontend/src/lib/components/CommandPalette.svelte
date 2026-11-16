@@ -48,6 +48,24 @@
       keywords: 'new add create wizard',
     },
     {
+      id: 'nav-machines',
+      category: 'nav',
+      label: () => t('nav.machines'),
+      path: '/machines',
+      icon: 'server',
+      keywords:
+        'remote access ssh telnet serial machine sftp host terminal files folders upload download copy transfer',
+    },
+    {
+      id: 'nav-host-terminal',
+      category: 'nav',
+      roles: ['admin'],
+      label: () => t('nav.hostTerminal'),
+      path: '/machines/host',
+      icon: 'terminal',
+      keywords: 'host console shell root pty',
+    },
+    {
       id: 'nav-apps',
       category: 'nav',
       label: () => t('nav.apps'),
@@ -147,7 +165,8 @@
       label: () => t('system.title'),
       path: '/system',
       icon: 'monitor',
-      keywords: 'system status host monitoring cpu memory disk network gpu log update health metrics',
+      keywords:
+        'system status host monitoring cpu memory disk network gpu log update health metrics',
     },
   ];
 

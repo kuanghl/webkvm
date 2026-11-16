@@ -24,6 +24,7 @@ import (
 	"webkvm/internal/netguard"
 	"webkvm/internal/nodes"
 	"webkvm/internal/notify"
+	"webkvm/internal/sshmachines"
 	"webkvm/internal/tokens"
 	"webkvm/internal/user"
 	"webkvm/internal/vmsched"
@@ -59,7 +60,7 @@ func NewRouter(
 	metricHist *metrics.TimeSeriesStore,
 	alerter *metrics.AlertEngine,
 	incusMetrics *incus.MetricsCollector,
-) *chi.Mux {
+) (*chi.Mux, *Handler) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
@@ -147,7 +148,10 @@ func NewRouter(
 		webauthn:      auth.NewWebAuthnManager(cfg),
 		StartedAt:     time.Now(),
 		hostMonitor:   monitor.NewHostMonitor(),
+		machines:      sshmachines.NewStore(cfg.SSHMachinesFile(), cfg.SSHMachineSecretsFile()),
 	}
+	h.sftpSessions = sshmachines.NewSFTPSessionRegistry(h.machines)
+	h.transfers = sshmachines.NewTransferManager(h.machines, h.sftpSessions, hub, cfg.DataDir)
 
 	h.EnsureMediaDirs()
 
@@ -632,6 +636,62 @@ func NewRouter(
 		})
 	})
 
+	// SSH Machines: named remote hosts over SSH/Telnet/Serial with a
+	// terminal bridge and an SFTP file browser. Records carry no
+	// secrets (credentials live in the 0600 companion file), but they do
+	// name every host, port and account the operator can reach, so the
+	// whole read surface rides the "console" capability — the same seam
+	// as the terminal, SFTP and transfers below, and the same rule as the
+	// VM console group: a viewer with an explicit console grant can open
+	// a machine terminal, and without it cannot even enumerate the
+	// inventory. Mutations, connection tests and host-key pinning stay
+	// operator+.
+	r.Route("/api/ssh-machines", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(h.requireCapability("console"))
+			r.Get("/", h.ListMachines)
+			r.Get("/{id}", h.GetMachine)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAtLeast("operator"))
+			r.Post("/", h.CreateMachine)
+			r.Put("/{id}", h.UpdateMachine)
+			r.Delete("/{id}", h.DeleteMachine)
+			r.Post("/{id}/test", h.MachineTest)
+			r.Post("/{id}/hostkey", h.MachineAcceptHostKey)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(h.requireCapability("console"))
+			r.Post("/{id}/terminal-ticket", h.MachineTerminalTicket)
+			r.Get("/{id}/terminal", h.MachineTerminal)
+			r.Get("/{id}/sftp/list", h.MachineSFTPList)
+			r.Get("/{id}/sftp/stat", h.MachineSFTPStat)
+			r.Get("/{id}/sftp/sizes", h.MachineSFPTSizes)
+			r.Get("/{id}/sftp/read", h.MachineSFTPRead)
+			r.Post("/{id}/sftp/write", h.MachineSFTPWrite)
+			r.Post("/{id}/sftp/mkdir", h.MachineSFTPMkdir)
+			r.Post("/{id}/sftp/delete", h.MachineSFTPDelete)
+			r.Post("/{id}/sftp/rename", h.MachineSFTRename)
+			r.Post("/{id}/sftp/chmod", h.MachineSFTPChmod)
+			r.Get("/{id}/sftp/realpath", h.MachineSFTPRealpath)
+			r.Post("/{id}/transfers", h.MachineTransferStart)
+			r.Get("/{id}/transfers", h.MachineTransferList)
+			r.Post("/{id}/transfers/{job}/cancel", h.MachineTransferCancel)
+			r.Get("/{id}/transfers/{job}/result", h.MachineTransferResult)
+			r.Delete("/{id}/transfers/{job}", h.MachineTransferRemove)
+		})
+	})
+
+	r.Route("/api/machine-transfers", func(r chi.Router) {
+		r.Use(h.requireCapability("console"))
+		r.Get("/", h.MachineTransfersAll)
+		r.Post("/clear", h.MachineTransfersClearFinished)
+		r.Post("/{job}/cancel", h.MachineTransferCancelJob)
+		r.Post("/{job}/pause", h.MachineTransferPauseJob)
+		r.Post("/{job}/resume", h.MachineTransferResumeJob)
+		r.Delete("/{job}", h.MachineTransferRemoveJob)
+	})
+
 	r.Route("/api/system", func(r chi.Router) {
 		r.Get("/cert", h.SystemCert)
 		r.Group(func(r chi.Router) {
@@ -796,7 +856,7 @@ func NewRouter(
 		})
 	})
 
-	return r
+	return r, h
 }
 
 // modelsRoleAdmin is a small helper to avoid importing models in the

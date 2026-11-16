@@ -88,6 +88,7 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zitadel/oidc/v3 v3.49.6 // indirect
 	github.com/zitadel/schema v1.3.2 // indirect
+	go.bug.st/serial v1.7.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect

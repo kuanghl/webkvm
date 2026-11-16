@@ -42,6 +42,8 @@ class EventsStore {
     this._removedListeners = new Set();
     this._metricsListeners = new Set();
     this._hostMetricsListeners = new Set();
+    this._transferListeners = new Set();
+    this._openListeners = new Set();
     this._reconnectTimer = null;
   }
 
@@ -69,10 +71,27 @@ class EventsStore {
     this._es = es;
 
     es.addEventListener('open', () => {
+      // The socket is up again: a manual reconnect queued while it was
+      // down is now redundant (the browser auto-reconnects on its own,
+      // and this open proves it worked). Leaving the timer armed would
+      // tear this fresh, healthy connection down one second later.
+      if (this._reconnectTimer) {
+        clearTimeout(this._reconnectTimer);
+        this._reconnectTimer = null;
+      }
       this.connected = true;
       this.reconnecting = false;
       this.reconnectAttempts = 0;
       this.lastError = null;
+      // Everything the socket missed while it was down is gone for good:
+      // anyone who derives state from these events has to resync now.
+      for (const fn of this._openListeners) {
+        try {
+          fn();
+        } catch (err) {
+          console.error('open listener error:', err);
+        }
+      }
     });
 
     es.addEventListener('connected', () => {
@@ -95,7 +114,20 @@ class EventsStore {
       this._dispatch('hostMetrics', e, this._hostMetricsListeners);
     });
 
+    es.addEventListener('transfer.progress', (e) => {
+      this._dispatch('transferProgress', e, this._transferListeners);
+    });
+
     es.addEventListener('error', () => {
+      // close() fires an 'error' event on the source it killed. By the
+      // time that ghost event runs, this._es points at the replacement
+      // (or is null after a deliberate disconnect), so a source that is
+      // no longer current must stay silent: reacting to its ghost error
+      // scheduled a reconnect that closed the healthy replacement one
+      // second later, whose ghost scheduled the next one — after the
+      // first blip the client settled into a permanent ~1s tear-down /
+      // reconnect cycle, dropping every event sent in between.
+      if (this._es !== es) return;
       this.connected = false;
       // If the session is gone, stop reconnecting entirely.
       if (!auth.isLoggedIn) {
@@ -188,6 +220,29 @@ class EventsStore {
     this.connect();
     return () => {
       this._hostMetricsListeners.delete(fn);
+    };
+  }
+
+  // Machine-transfer progress (SSE "transfer.progress" events). The
+  // listener receives the full event object: { job_id, machine_id,
+  // machine, kind, remote_path, done, total, status } (the inner
+  // `data` field of the envelope).
+  onTransferProgress(fn) {
+    this._transferListeners.add(fn);
+    this.connect();
+    return () => {
+      this._transferListeners.delete(fn);
+    };
+  }
+
+  // Fired on every successful open, first connect included. A dropped
+  // socket loses the events sent while it was down, so a store that
+  // builds state from them needs this hook to heal itself.
+  onOpen(fn) {
+    this._openListeners.add(fn);
+    this.connect();
+    return () => {
+      this._openListeners.delete(fn);
     };
   }
 }

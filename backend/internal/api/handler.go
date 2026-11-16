@@ -26,6 +26,7 @@ import (
 	"webkvm/internal/netguard"
 	"webkvm/internal/nodes"
 	"webkvm/internal/notify"
+	"webkvm/internal/sshmachines"
 	"webkvm/internal/tokens"
 	"webkvm/internal/user"
 	"webkvm/internal/vmsched"
@@ -73,6 +74,13 @@ type Handler struct {
 
 	// hostMonitor collects comprehensive host metrics for the monitoring panel.
 	hostMonitor *monitor.HostMonitor
+
+	// SSH Machines (sshmachines): the store holds records + secrets,
+	// the registry pools per-machine SFTP sessions, and the manager
+	// owns the transfer jobs.
+	machines     *sshmachines.Store
+	sftpSessions *sshmachines.SFTPSessionRegistry
+	transfers    *sshmachines.TransferManager
 
 	// Per-name serialization of appliance deployments. Two
 	// concurrent deploys must never race: the second one waits, then

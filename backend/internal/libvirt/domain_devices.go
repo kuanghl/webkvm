@@ -387,7 +387,6 @@ func (c *Connector) ChangeDiskBus(id, target, newBus string) error {
 // PCI host device & VFIO passthrough implementation is located in domain_pci.go.
 // 9p shared folders implementation is located in domain_shares.go.
 
-
 func (c *Connector) UpdateDiskSource(id, target, source string) error {
 	dom, err := c.lookupDomain(id)
 	if err != nil {
@@ -733,7 +732,6 @@ func (c *Connector) CheckVLANSupport(networkName string) (models.VlanSupport, er
 	}, nil
 }
 
-
 // ResizeDomainDisk grows (or shrinks) the backing file of a VM disk
 // identified by its target device (e.g. "vda", "sdb").
 //
@@ -892,4 +890,3 @@ func extractTagAttr(xml, attr string) string {
 	}
 	return xml[s : s+e]
 }
-

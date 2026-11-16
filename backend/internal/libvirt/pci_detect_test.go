@@ -216,4 +216,3 @@ func TestBindPCIDeviceVFIO_PreflightFailsWhenNoDriver(t *testing.T) {
 		}
 	}
 }
-

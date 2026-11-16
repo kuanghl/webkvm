@@ -328,3 +328,110 @@ cat /opt/webkvm/logs/backend.log  # cuando WEBKVM_LOG_FILE está activo
 | No conecta con libvirt | Comprueba `systemctl status libvirtd`; el backend se ejecuta como root |
 | No se puede crear una VM desde ISO | Sube antes la ISO en **Almacenamiento** y después adjúntala |
 | La consola serie dice que la VM está apagada | Arranca la VM; la consola se reconecta sola en el siguiente intento |
+| La máquina queda en **Pendiente de confianza** | Ábrela y confirma la huella de la clave SSH del host |
+| ZMODEM avisa de que la máquina no responde | Instala `lrzsz` en la máquina (`apt install lrzsz`) |
+
+## 12. Máquinas remotas (SSH, Telnet, serie)
+
+**Acceso remoto** (`#/machines`) registra los host con los que trabajas desde el
+navegador: **SSH** (contraseña o clave privada), **Telnet** (host + puerto) o un
+enlace **serie** (`/dev/ttyUSB0` + velocidad). Cada máquina tiene terminal, y las
+SSH además explorador de archivos. Tu propio host aparece como la máquina
+**Local** integrada, así que su shell —y su sistema de ficheros— están a un clic;
+recorrerla es solo para administradores, porque esas lecturas y escrituras van
+con los privilegios propios de WebKVM. Las **Mosh** se pueden
+registrar para el futuro, pero esta versión no soporta Mosh: el terminal se niega
+a abrirla, así que usa SSH.
+
+| Acción | Quién |
+|--------|------|
+| Añadir / editar / borrar una máquina, fijar una clave de host, probar el enlace | `operator` o superior |
+| Abrir terminal, explorar archivos, transferir | la capacidad `console` (incluido un viewer con permiso explícito) |
+| Explorar o transferir en la máquina **Local** integrada | solo `admin` |
+
+Contraseñas y claves privadas se guardan en el servidor bajo `/opt/webkvm` y nunca
+vuelven al navegador: la API solo informa `has_password` / `has_key`. Borrar una
+máquina elimina su registro y sus credenciales; no se toca nada del host remoto.
+
+La primera conexión a un host SSH muestra la huella de su clave y no hace nada más
+hasta que la confirmes. Un cambio posterior de clave es un error, no un aviso:
+verifica la huella por otro canal antes de volver a fijarla.
+
+La máquina **Local** integrada también puede guardar una cuenta y una
+contraseña, desde su pestaña **Settings** (solo admin): con ambas guardadas, la
+terminal del host inicia sesión sola —teclea la contraseña una vez en el prompt
+de login y, si el host la rechaza, el prompt te vuelve tal cual era antes, nunca
+una segunda suposición— y el botón **Test** verifica la pareja guardada contra
+el login propio de esta máquina. No hay clave de host que fijar en la tarjeta
+local: un login de getty no tiene mitad de clave, así que el flujo de fijado no
+le aplica.
+
+### Archivos (la pestaña **Archivos** de una máquina)
+
+La pestaña abre en la carpeta de la máquina. **Transferir** levanta el segundo
+panel, apuntado a otra máquina; entonces selecciona en uno y usa **Copiar a
+\<nombre>**, o arrastra la selección de un lado al otro. Las copias máquina →
+máquina van en streaming directo entre ambos host: los bytes no pasan por el
+host de WebKVM ni por el navegador. La máquina **Local** integrada también se
+recorre y puede ser cualquiera de los dos extremos de una copia.
+
+- Las carpetas son recursivas: hasta 32 niveles y 20 000 entradas por trabajo.
+- La última miga es una barra de ruta: escribe una ruta absoluta o un nombre
+  relativo a la carpeta actual y Enter salta. Las filas tienen casillas de
+  verificación (la cabecera tiene seleccionar todo, como Ctrl+A) —lo que
+  marcas es lo que se copia o descarga— y las carpetas muestran un tamaño de un
+  sondeo acotado en segundo plano (`≈` si el sondeo se detuvo antes). Un botón
+  de carpeta sube un árbol entero, y varios elementos seleccionados se descargan
+  como un solo trabajo y un único `tar.gz`.
+- Las escrituras son atómicas: el destino ve `nombre` solo cuando llega el último
+  byte, así que una copia cancelada o fallida no deja ficheros a medias.
+- Los symlinks se recrean como enlaces (nunca se siguen), se conservan las
+  carpetas vacías, el modo y la mtime, y las fifos/sockets/devices se omiten y se
+  cuentan en el trabajo en lugar de colgarlo.
+- Una carpeta descargada se sirve como `.tar.gz`, y un archivo suelto ya llega
+  solo al navegador cuando el trabajo termina: no hay que volver a pulsar la
+  fila de la cola.
+- **Transferencias** (debajo de los paneles) mantiene una fila por
+  acción con progreso por archivo, velocidad y ETA; un trabajo en curso puede
+  **pausarse** (se detiene entre chunks y reanuda donde lo dejó) y cancelar
+  detiene el trabajo y elimina lo que estaba en vuelo —cancelar funciona desde
+  pausado también. El progreso llega por el mismo canal SSE que el
+  resto de la interfaz: nada consulta a intervalo.
+- Los resultados de descarga se cachean en `/opt/webkvm/ssh-transfers` (las 50
+  últimas tareas terminadas; borrar una fila elimina su caché).
+
+### ZMODEM para máquinas Telnet y serie
+
+Los enlaces Telnet y serie no tienen canal SFTP, así que los archivos viajan por
+el propio terminal, en ambos sentidos. En el terminal de la máquina, **Mover
+archivos por ZMODEM (sz/rz)** abre un diálogo con dos pestañas.
+
+**Recibir de la máquina (`sz`)**: escribe las rutas de la máquina (una por
+línea; la shell remota expande `*` y `?`), marca **Incluir el contenido de
+carpetas (`sz -r`)** para directorios y pulsa **Enviar sz**. WebKVM ejecuta `sz`
+en el remoto, recibe el lote a través del terminal y lo registra como una
+transferencia normal, de modo que la cola y el enlace de descarga funcionan igual
+que sobre SSH.
+
+**Enviar a la máquina (`rz`)**: elige o suelta hasta 32 archivos y pulsa
+**Enviar rz**. El lote se guarda primero en el host de WebKVM, porque un enlace
+serie no puede detenerse a negociar un segundo canal mientras escribes; a
+continuación el terminal hace el papel de emisor hasta que el `rz` remoto lo
+acepta. La cola muestra una fila de subida con el mismo progreso y cancelación
+que cualquier otra transferencia.
+
+- La máquina remota necesita `lrzsz` en cualquier sentido. Si no responde en unos
+  segundos el terminal se libera de nuevo y lo indica.
+- El protocolo solo se arma al pulsar el botón: no se intercepta nada del flujo
+  del terminal y las teclas que hayas escrito mientras se espera se reintroducen
+  tal cual.
+- `sz` no transporta permisos ni marcas de tiempo, así que una descarga recursiva
+  mantiene nombres y contenido únicamente.
+- `rz` escribe en el directorio donde esté la shell remota, así que haz `cd` allí
+  antes. Una carpeta soltada llega achatada a un nombre por archivo, y un nombre
+  que ya existe lo renombra el propio `rz -E` (`notes.txt.0`) en lugar de
+  sobrescribirlo o preguntar: nadie mira el terminal para contestar.
+- Un lote guardado que ningún terminal reclama se descarta a los 15 minutos, y
+  una máquina SSH rechaza todo este camino a favor de su pestaña **Archivos**.
+- Una sola sesión ZMODEM por terminal; el terminal debe permanecer abierto
+  mientras dura.

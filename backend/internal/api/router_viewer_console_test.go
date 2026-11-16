@@ -76,12 +76,13 @@ func liveRouter(t *testing.T, username, role string, perms *models.UserPermissio
 		t.Fatalf("token: %v", err)
 	}
 
-	r := NewRouter(
+	r, h := NewRouter(
 		&config.Config{DataDir: dir},
 		nil, &viewerBackend{owner: username}, authMgr, nil, nil, nil, us, nil,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 		nil, nil, nil, nil,
 	)
+	t.Cleanup(h.Close)
 	return r, token
 }
 
@@ -130,8 +131,12 @@ func TestRouter_ViewerWithoutConsoleIsDenied(t *testing.T) {
 
 	for _, rt := range []capRoute{
 		{http.MethodGet, "/api/vms/vm1/graphics"},
-		{http.MethodPost, "/api/vms/vm1/vnc-ticket"},
-		{http.MethodGet, "/api/vms/vm1/spice"},
+		{http.MethodGet, "/api/vms/vm1/serial"},
+		{http.MethodGet, "/api/ssh-machines"},
+		{http.MethodGet, "/api/ssh-machines/m1"},
+		{http.MethodPost, "/api/ssh-machines/m1/terminal-ticket"},
+		{http.MethodGet, "/api/ssh-machines/m1/sftp/list"},
+		{http.MethodGet, "/api/machine-transfers"},
 	} {
 		t.Run(rt.path, func(t *testing.T) {
 			if got := liveStatus(t, r, token, rt.method, rt.path); got != http.StatusForbidden {

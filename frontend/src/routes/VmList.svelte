@@ -592,9 +592,16 @@ apt-get update -y
     const offMetrics = events.onVmMetrics((e) => {
       metricsByVm = { ...metricsByVm, [e.vm_id]: e.data };
     });
+    // The socket never replays what it missed: a shutoff that landed
+    // while the SSE was down would leave this table (and its "N
+    // running" subtitle) stale until a remount. Resilient heal:
+    // silent re-list on every (re)open.
+    const offOpen = events.onOpen(() => loadVMs({ silent: true }));
+
     return () => {
       off();
       offMetrics();
+      offOpen();
     };
   });
 
@@ -605,17 +612,20 @@ apt-get update -y
     stopAppPoller();
   });
 
-  async function loadVMs() {
-    loading = true;
-    error = '';
+  async function loadVMs(opts = {}) {
+    const silent = !!opts?.silent;
+    if (!silent) {
+      loading = true;
+      error = '';
+    }
     try {
       vms = await api.listVMs();
       // Fire-and-forget sparkline load; don't block the table render.
       loadSparklines();
     } catch (e) {
-      error = e.message;
+      if (!silent) error = e.message;
     } finally {
-      loading = false;
+      if (!silent) loading = false;
     }
   }
 

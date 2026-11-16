@@ -232,6 +232,10 @@ async function request(path, opts = {}) {
     throw new ApiError('Session expired', 401, 'unauthorized');
   }
 
+  // 204 (DELETE /api/ssh-machines/{id}) carries no body by contract —
+  // parsing one would throw invalid_json on an empty string.
+  if (res.status === 204) return null;
+
   const text = await res.text().catch(() => '');
   let data;
   try {
@@ -272,6 +276,42 @@ async function request(path, opts = {}) {
   }
   if (data?.csrf) csrfState = data.csrf;
   return data;
+}
+
+// xhrUpload posts a multipart body where fetch cannot report progress.
+// Both transfers that begin with a browser-side file go through it: the
+// SFTP upload and the ZMODEM staging batch. `fallback` names the failure
+// when the server answered without a JSON error to show.
+function xhrUpload({ url, formData, onProgress, fallback, code }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      });
+    }
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText || '{}'));
+      } else if (xhr.status === 401) {
+        auth.onUnauthorized();
+        reject(new ApiError('Unauthorized', 401, 'unauthorized'));
+      } else {
+        let j = null;
+        try {
+          j = JSON.parse(xhr.responseText);
+        } catch {
+          /* an HTML error page is not a message worth showing raw */
+        }
+        reject(new ApiError(j?.error || fallback, xhr.status, code, j?.data || null));
+      }
+    });
+    xhr.addEventListener('error', () => reject(new ApiError(fallback, 0, 'network')));
+    xhr.open('POST', url);
+    xhr.withCredentials = true;
+    if (csrfState) xhr.setRequestHeader('X-CSRF-Token', csrfState);
+    xhr.send(formData);
+  });
 }
 
 export const api = {
@@ -1238,6 +1278,173 @@ export const api = {
   listBackupChains: (id) => request(`/backup/targets/${id}/chains`),
   deleteBackupChain: (id, vmID) =>
     request(`/backup/targets/${id}/chains/${encodeURIComponent(vmID)}`, { method: 'DELETE' }),
+
+  // --- SSH machines (remote SSH/Telnet/Serial hosts) ---
+  listMachines: () => request('/ssh-machines'),
+  getMachine: (id) => request(`/ssh-machines/${encodeURIComponent(id)}`),
+  createMachine: (data) => request('/ssh-machines', { method: 'POST', body: JSON.stringify(data) }),
+  updateMachine: (id, data) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteMachine: (id) => request(`/ssh-machines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  testMachine: (id) => request(`/ssh-machines/${encodeURIComponent(id)}/test`, { method: 'POST' }),
+  // Pins (or re-pins) the presented host-key fingerprint after the
+  // operator reviewed it in the test dialog.
+  acceptMachineHostKey: (id, fingerprint) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/hostkey`, {
+      method: 'POST',
+      body: JSON.stringify({ fingerprint }),
+    }),
+  getMachineTerminalTicket: (id) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/terminal-ticket`, { method: 'POST' }),
+
+  // Machine SFTP file browser (ssh machines only).
+  machineSFTPList: (id, path) =>
+    request(
+      `/ssh-machines/${encodeURIComponent(id)}/sftp/list${path ? `?path=${encodeURIComponent(path)}` : ''}`
+    ),
+  machineSFTPRead: (id, path, offset = 0, limit) => {
+    let q = `?path=${encodeURIComponent(path)}&offset=${offset}`;
+    if (limit) q += `&limit=${limit}`;
+    return request(`/ssh-machines/${encodeURIComponent(id)}/sftp/read${q}`);
+  },
+  machineSFTPWrite: (id, data) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/sftp/write`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  machineSFTPMkdir: (id, path) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/sftp/mkdir`, {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
+  machineSFTPDelete: (id, path) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/sftp/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
+  machineSFTPRename: (id, from, to) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/sftp/rename`, {
+      method: 'POST',
+      body: JSON.stringify({ from, to }),
+    }),
+  machineSFTPChmod: (id, path, mode) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/sftp/chmod`, {
+      method: 'POST',
+      body: JSON.stringify({ path, mode }),
+    }),
+  machineSFTPRealpath: (id, path) =>
+    request(
+      `/ssh-machines/${encodeURIComponent(id)}/sftp/realpath?path=${encodeURIComponent(path)}`
+    ),
+  // Batch Lstat for the copy dialog: one round trip answers "which of
+  // these names are already taken" so conflicts can be asked about in a
+  // single dialog instead of one prompt per colliding file.
+  // One repeated `paths=` per target: joining with commas split a remote
+  // name that contains one (`report, 2026.txt`) into two bogus paths.
+  machineSFTPStat: (id, paths) => {
+    const params = new SvelteURLSearchParams();
+    for (const p of paths || []) params.append('paths', p);
+    return request(`/ssh-machines/${encodeURIComponent(id)}/sftp/stat?${params.toString()}`);
+  },
+  // Folder sizes: one bounded walk per path (the server caps depth and
+  // entry count), so a listing can show "≈ 1.2 GB" on a directory. A
+  // per-path entry error never fails the request.
+  machineSFTPSizes: (id, paths) => {
+    const params = new SvelteURLSearchParams();
+    for (const p of paths || []) params.append('paths', p);
+    return request(`/ssh-machines/${encodeURIComponent(id)}/sftp/sizes?${params.toString()}`);
+  },
+
+  // Machine transfers: single-file upload/download with progress and
+  // cancel, tracked server-side and updated live via the SSE
+  // "transfer.progress" events (events.onTransferProgress).
+  machineTransferUpload: (id, file, remotePath, onProgress) => {
+    const formData = new FormData();
+    formData.append('action', 'upload');
+    formData.append('remote_path', remotePath || '');
+    formData.append('file', file);
+    return xhrUpload({
+      url: `${BASE}/ssh-machines/${encodeURIComponent(id)}/transfers`,
+      formData,
+      onProgress,
+      fallback: 'Upload failed',
+      code: 'upload_failed',
+    });
+  },
+  // ZMODEM upload, step one: hand the batch to the webkvm host and get the
+  // stage id. Nothing is in flight yet — a second frame on the live
+  // terminal asks for it. `items` are {file, name} pairs, and the name may
+  // carry folders: rz never recurses, so the server flattens it.
+  machineZmodemStage: (id, items, onProgress) => {
+    const formData = new FormData();
+    formData.append('action', 'zmodem-stage');
+    for (const it of items || []) formData.append('file', it.file, it.name || it.file.name);
+    return xhrUpload({
+      url: `${BASE}/ssh-machines/${encodeURIComponent(id)}/transfers`,
+      formData,
+      onProgress,
+      fallback: 'Staging failed',
+      code: 'stage_failed',
+    });
+  },
+  machineTransferDownload: (id, remotePath, fileName) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/transfers`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'download', remote_path: remotePath, file_name: fileName }),
+    }),
+  // Several entries in one job: the server merges the roots into one
+  // tree (deduped top-level names) and its /result endpoint streams a
+  // single tar.gz — one queue row, one browser save.
+  machineTransferDownloadBatch: (id, paths, fileName) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/transfers`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'download-batch', paths, file_name: fileName }),
+    }),
+  // machine↔machine relay: the bytes stream through the server without
+  // ever landing on its disk. `overwrite` is skip|overwrite|rename.
+  machineTransferCopy: (srcId, body) =>
+    request(`/ssh-machines/${encodeURIComponent(srcId)}/transfers`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'copy', ...body }),
+    }),
+  listMachineTransfers: (id) => request(`/ssh-machines/${encodeURIComponent(id)}/transfers`),
+  // One request for every job across every machine (the sidebar's
+  // queue). `machines` is a display filter applied server-side.
+  listAllMachineTransfers: (machineIds, limit = 200) => {
+    const wanted = machineIds?.length
+      ? `&machines=${encodeURIComponent(machineIds.join(','))}`
+      : '';
+    return request(`/machine-transfers?limit=${encodeURIComponent(String(limit))}${wanted}`);
+  },
+  cancelMachineTransfer: (id, job) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/transfers/${encodeURIComponent(job)}/cancel`, {
+      method: 'POST',
+    }),
+  removeMachineTransfer: (id, job) =>
+    request(`/ssh-machines/${encodeURIComponent(id)}/transfers/${encodeURIComponent(job)}`, {
+      method: 'DELETE',
+    }),
+  // Job-granular twins of the per-machine routes, for a queue row that
+  // only knows the job id (the cross-machine sidebar). Ownership is
+  // checked server-side; a foreign job answers 404.
+  cancelMachineTransferJob: (job) =>
+    request(`/machine-transfers/${encodeURIComponent(job)}/cancel`, { method: 'POST' }),
+  removeMachineTransferJob: (job) =>
+    request(`/machine-transfers/${encodeURIComponent(job)}`, { method: 'DELETE' }),
+  // The queue's "clear completed": one server pass unloads every
+  // terminal job instead of one DELETE per row.
+  clearMachineTransfers: () => request('/machine-transfers/clear', { method: 'POST' }),
+  pauseMachineTransferJob: (job) =>
+    request(`/machine-transfers/${encodeURIComponent(job)}/pause`, { method: 'POST' }),
+  resumeMachineTransferJob: (job) =>
+    request(`/machine-transfers/${encodeURIComponent(job)}/resume`, { method: 'POST' }),
+  // The SPA fetches finished downloads with its cookie (attachment
+  // headers stream the bytes straight to the browser's download bar).
+  machineTransferResultUrl: (id, job) =>
+    `${BASE}/ssh-machines/${encodeURIComponent(id)}/transfers/${encodeURIComponent(job)}/result`,
 
   // --- generic helpers ---
   // post sends a JSON POST to an absolute path (caller must include the

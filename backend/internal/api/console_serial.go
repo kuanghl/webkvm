@@ -26,6 +26,7 @@ import (
 	"webkvm/internal/compute"
 	"webkvm/internal/models"
 	"webkvm/internal/safego"
+	"webkvm/internal/sshmachines"
 )
 
 // serialSessions tracks the currently active SerialProxy WebSocket
@@ -244,9 +245,11 @@ func (h *Handler) SerialProxy(w http.ResponseWriter, r *http.Request) {
 }
 
 // HostTerminal proxies a WebSocket to a login prompt (getty-style) on
-// the host via PTY. The user must authenticate with real system
-// credentials — no auto-root. Must be called from an admin-only route
-// group.
+// the host via PTY. The operator authenticates with real system
+// credentials — no auto-root — either by typing them, or, when the host
+// card stores an account, via the one-shot auto-feed that types the
+// stored pair at most once (a rejection hands the prompt back). Must be
+// called from an admin-only route group.
 func (h *Handler) HostTerminal(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -288,7 +291,20 @@ func (h *Handler) HostTerminal(w http.ResponseWriter, r *http.Request) {
 	// -p keeps the minimal, explicit environment below so the login shell
 	// gets a UTF-8 locale and truecolor (without it login drops LANG/LC_ALL).
 	// This is safe because the service's own environment is never inherited.
+	//
+	// With a stored account the card is not bare any more: login takes the
+	// user as an argument, so the first prompt is already the password
+	// one, and the auto-feed in the PTY pump types user and password at
+	// most once each. A rejection hands the prompt back to the
+	// operator, who types it the old way.
 	cmd := exec.Command("/bin/login", "-p")
+	var autoFeed *hostAutoFeed
+	if rec := h.machines.HostMachine(); rec.AuthType == sshmachines.AuthPassword && rec.User != "" {
+		if sec, _, serr := h.machines.GetSecret(sshmachines.HostMachineID); serr == nil && sec.Password != "" {
+			autoFeed = newHostAutoFeed(rec.User, sec.Password, time.Now().Add(30*time.Second))
+			cmd = exec.Command("/bin/login", "-p", rec.User)
+		}
+	}
 	cmd.Env = hostTerminalEnv()
 
 	ptmx, err := pty.StartWithAttrs(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}, &syscall.SysProcAttr{Setsid: true})
@@ -406,6 +422,30 @@ func (h *Handler) HostTerminal(w http.ResponseWriter, r *http.Request) {
 			}
 			eioCount = 0
 			lastActivity.Store(time.Now().Unix())
+			// One-shot auto-login of the stored host account. The
+			// feed types the user and the password at most once each;
+			// once it settles (typed, rejected, or timed out) every
+			// later chunk goes to the browser untouched, and so do
+			// the operator's keystrokes.
+			if autoFeed != nil {
+				if w, giveUp := autoFeed.observe(buf[:n], time.Now()); w != "" {
+					if _, werr := ptmx.Write([]byte(w)); werr != nil {
+						slog.Warn("host_terminal_autologin_write_failed", "err", werr, "login_user", autoFeed.user)
+					} else if autoFeed.passwordSent() {
+						slog.Info("host_terminal_autologin_typed", "login_user", autoFeed.user)
+						if h.audit != nil {
+							// "typed", not "autologin": this is the moment the
+							// password left the store for the PTY, not a
+							// verdict — the login may still be rejected.
+							h.audit.Log(auditFor(r, "host.terminal.autologin_typed", "host", map[string]interface{}{
+								"login_user": autoFeed.user,
+							}))
+						}
+					}
+				} else if giveUp {
+					slog.Info("host_terminal_autologin_gave_up", "login_user", autoFeed.user)
+				}
+			}
 			atomic.AddInt64(&wsWrites, 1)
 			if err := writeWS(websocket.BinaryMessage, buf[:n]); err != nil {
 				errc <- err

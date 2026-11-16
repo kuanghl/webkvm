@@ -33,6 +33,7 @@ var bulkUploadPrefixes = []string{
 // 8 MB), which the global 1 MiB cap would otherwise silently override.
 var ownLimitRoutes = []struct{ prefix, suffix string }{
 	{"/api/vms/", "/cover"},
+	{"/api/ssh-machines/", "/transfers"},
 }
 
 // exemptFromGlobalLimit reports whether path is a route that installs
